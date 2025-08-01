@@ -1,9 +1,6 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-} from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
@@ -48,6 +45,7 @@ import {
   startOfMonth,
   endOfMonth,
 } from "date-fns";
+import TaskManagement from "./TaskManagement";
 
 const AdminDashboard = () => {
   const [timesheets, setTimesheets] = useState([]);
@@ -202,19 +200,11 @@ const AdminDashboard = () => {
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            {userRole === "admin" && (
-              <Button
-                variant="outline"
-                onClick={() => {
-                  /* navigate("/employee-management") */
-                }}
-                className="flex items-center gap-2"
-              >
-                <Settings className="h-4 w-4" />
-                Employee Management
-              </Button>
-            )}
+          <div className="flex items-center gap-4">
+            <Button variant="outline" className="flex items-center gap-2">
+              <Settings className="h-4 w-4" />
+              Employee Management
+            </Button>
             <Button variant="outline" onClick={handleLogout}>
               <LogOut className="h-4 w-4 mr-2" />
               Sign Out
@@ -303,27 +293,29 @@ const AdminDashboard = () => {
               </>
             )}
           </div>
-          <div className="p-4">
-            <div className="flex justify-center items-center gap-2">
-              <Search className="h-4 w-4 text-gray-500" />
-              <Input
-                placeholder="Search by employee name..."
-                value={employeeSearchTerm}
-                onChange={(e) => setEmployeeSearchTerm(e.target.value)}
-                className="w-64"
-              />
-              {employeeSearchTerm && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setEmployeeSearchTerm("")}
-                  className="text-xs"
-                >
-                  Clear
-                </Button>
-              )}
+          {activeTab === "timesheets" && (
+            <div className="p-4">
+              <div className="flex justify-center items-center gap-2">
+                <Search className="h-4 w-4 text-gray-500" />
+                <Input
+                  placeholder="Search by employee name..."
+                  value={employeeSearchTerm}
+                  onChange={(e) => setEmployeeSearchTerm(e.target.value)}
+                  className="w-64"
+                />
+                {employeeSearchTerm && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setEmployeeSearchTerm("")}
+                    className="text-xs"
+                  >
+                    Clear
+                  </Button>
+                )}
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
         {activeTab === "timesheets" ? (
@@ -516,8 +508,8 @@ const AdminDashboard = () => {
             })()}
           </div>
         ) : activeTab === "tasks" ? (
-          <div className="bg-white rounded-lg shadow p-8 text-center">
-            Task Management Placeholder
+          <div>
+            <TaskManagement />
           </div>
         ) : (
           <div className="bg-white rounded-lg shadow p-8 text-center">
