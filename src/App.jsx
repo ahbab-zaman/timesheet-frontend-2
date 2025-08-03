@@ -1,8 +1,9 @@
 import React from "react";
 import { Button } from "./components/ui/button";
-import Login from "./pages/ LogIn/Login";
-import AdminDashboard from "./pages/admin/adminDashboard";
-import EmployeeManagement from "./pages/Employee/EmployeeManagement";
+import Login from "./pages/login/Login";
+import AdminDashboard from "./pages/admin/AdminDashboard";
+import EmployeeManagement from "./pages/admin/EmployeeManagement";
+import MainLayout from "./components/layout/MainLayout";
 
 const App = () => {
   return (
@@ -10,7 +11,9 @@ const App = () => {
       {/* <Button>Mo</Button> */}
       {/* <Login /> */}
       {/* <AdminDashboard /> */}
-      <EmployeeManagement />
+      {/* <EmployeeManagement /> */}
+      {/* <h1>Timesheet Project</h1> */}
+      <MainLayout/>
     </div>
   );
 };

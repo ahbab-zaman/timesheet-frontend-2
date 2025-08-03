@@ -1,0 +1,15 @@
+
+
+This folder contains all the page components used in the application, 
+where each file corresponds to a specific route.
+
+Structure Guideline:
+1. Each route in the app should have its own dedicated file inside this folder.
+2. The file name should reflect the route name for easy understanding.
+3. Use React functional components, preferably with named exports.
+4. Keep page-specific logic (e.g., local state, API calls) inside these components.
+
+What not to include
+1. Don’t include shared components (like buttons, cards, modals) here. 
+   Instead, place those in a components/ folder.
+2. Don’t use this folder for layout or utility logic.
