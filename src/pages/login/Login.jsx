@@ -7,6 +7,9 @@ import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Clock, Users, CheckCircle } from 'lucide-react';
 import { useLoginMutation } from '@/redux/features/auth/authApi';
+import { useDispatch } from 'react-redux';
+import { setUser } from '@/redux/features/auth/authSlice';
+import { verifyToken } from '@/utils/verifyToken';
 
 // Dummy data to replace Supabase
 const dummyUsers = [
@@ -149,9 +152,10 @@ const Login = () => {
   const navigate = useNavigate();
   const { toast, ToastContainer } = useToast();
 
-  const [login, {data, error}] = useLoginMutation()
+  const dispatch = useDispatch();
+  const [login, {error}] = useLoginMutation()
 
-  console.log(data, "data");
+
   console.log(error, "error");
 
   useEffect(() => {
@@ -218,13 +222,32 @@ const Login = () => {
 
   const handleUserLogin = async (e) => {
     e.preventDefault();
-    // setLoading(true);
+    setLoading(true);
 
-    const credentials = { email, password };
-    console.log(credentials)
+    const credentials = { email, password }
+    const response = await login(credentials).unwrap();
 
-    login(credentials);
+    if (response.error) {
+      toast({
+        title: "Login failed",
+        description: response.error.message,
+        variant: "destructive",
+      });
+      return;
+    } else {
+      toast({
+        title: "Welcome back! ✨",
+        description: "Redirecting to your dashboard...",
+      });
+      setLoading(false);
+    }
 
+    const user = verifyToken(response.token);
+    dispatch(setUser({user: user, token: response.token}));
+
+
+
+    setLoading(false);
   }
 
   const handleSignIn = async (e) => {
