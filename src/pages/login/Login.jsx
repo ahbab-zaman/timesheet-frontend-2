@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Clock, Users, CheckCircle } from 'lucide-react';
+import { useLoginMutation } from '@/redux/features/auth/authApi';
 
 // Dummy data to replace Supabase
 const dummyUsers = [
@@ -148,6 +149,11 @@ const Login = () => {
   const navigate = useNavigate();
   const { toast, ToastContainer } = useToast();
 
+  const [login, {data, error}] = useLoginMutation()
+
+  console.log(data, "data");
+  console.log(error, "error");
+
   useEffect(() => {
     if (user && !loading) {
       // Only redirect if we have a user and auth is not loading
@@ -208,7 +214,21 @@ const Login = () => {
     }
   };
 
+
+
+  const handleUserLogin = async (e) => {
+    e.preventDefault();
+    // setLoading(true);
+
+    const credentials = { email, password };
+    console.log(credentials)
+
+    login(credentials);
+
+  }
+
   const handleSignIn = async (e) => {
+    console.log("clicked")
     e.preventDefault();
     setLoading(true);
     
@@ -308,7 +328,7 @@ const Login = () => {
                 </TabsList>
                 
                 <TabsContent value="signin">
-                  <form onSubmit={handleSignIn} className="space-y-4">
+                  <form onSubmit={handleUserLogin} className="space-y-4">
                     <div className="space-y-2">
                       <Label htmlFor="email">Email</Label>
                       <Input
