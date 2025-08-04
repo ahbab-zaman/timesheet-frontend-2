@@ -4,6 +4,9 @@ import Login from "./pages/login/Login";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import EmployeeManagement from "./pages/admin/EmployeeManagement";
 import MainLayout from "./components/layout/MainLayout";
+import EmployeeDashboard from "./pages/employee/EmployeeDashboard";
+import { Toaster } from "sonner";
+import ManagerDashboard from "./pages/manager/ManagerDashboard";
 
 const App = () => {
   return (
@@ -13,7 +16,10 @@ const App = () => {
       {/* <AdminDashboard /> */}
       {/* <EmployeeManagement /> */}
       {/* <h1>Timesheet Project</h1> */}
-      <MainLayout/>
+      {/* <MainLayout/> */}
+      <EmployeeDashboard />
+      {/* <ManagerDashboard />*/}
+      <Toaster position="bottom-right" />
     </div>
   );
 };
