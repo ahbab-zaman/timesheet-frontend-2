@@ -9,11 +9,6 @@ import ProtectedRoute from "./components/layout/ProtectedRoute";
 const App = () => {
   return (
     <div>
-      {/* <Button>Mo</Button> */}
-      {/* <Login /> */}
-      {/* <AdminDashboard /> */}
-      {/* <EmployeeManagement /> */}
-      {/* <h1>Timesheet Project</h1> */}
     <ProtectedRoute>
        <MainLayout/>
     </ProtectedRoute>

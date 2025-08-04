@@ -10,13 +10,18 @@ import { useLoginMutation } from '@/redux/features/auth/authApi';
 import { useDispatch } from 'react-redux';
 import { setUser } from '@/redux/features/auth/authSlice';
 import { verifyToken } from '@/utils/verifyToken';
+import { useNavigate } from 'react-router-dom';
+// import { toast } from 'sonner';
+import {toast} from "react-hot-toast"
 
 // Dummy data to replace Supabase
 const dummyUsers = [
-  { id: 1, email: 'admin@test.com', password: 'admin123', fullName: 'Admin User', role: 'admin' },
+  // { id: 1, email: 'admin@test.com', password: 'admin123', fullName: 'Admin User', role: 'admin' },
+  { id: 1, email: 'john@example3.com', password: 'securePassword1234', fullName: 'Admin User', role: 'admin' },
   { id: 2, email: 'manager@test.com', password: 'manager123', fullName: 'Manager User', role: 'manager' },
   { id: 3, email: 'employee@test.com', password: 'employee123', fullName: 'Employee User', role: 'employee' },
-  { id: 4, email: 'finance@test.com', password: 'finance123', fullName: 'Finance User', role: 'finance' }
+  { id: 4, email: 'finance@test.com', password: 'finance123', fullName: 'Finance User', role: 'finance' },
+  
 ];
 
 const dummyEmployees = [
@@ -69,52 +74,52 @@ const useAuth = () => {
 };
 
 // Mock useToast hook
-const useToast = () => {
-  const [toasts, setToasts] = useState([]);
+// const useToast = () => {
+//   const [toasts, setToasts] = useState([]);
 
-  const toast = ({ title, description, variant = 'default' }) => {
-    const newToast = {
-      id: Date.now(),
-      title,
-      description,
-      variant
-    };
+//   const toast = ({ title, description, variant = 'default' }) => {
+//     const newToast = {
+//       id: Date.now(),
+//       title,
+//       description,
+//       variant
+//     };
     
-    setToasts(prev => [...prev, newToast]);
+//     setToasts(prev => [...prev, newToast]);
     
-    setTimeout(() => {
-      setToasts(prev => prev.filter(t => t.id !== newToast.id));
-    }, 4000);
-  };
+//     setTimeout(() => {
+//       setToasts(prev => prev.filter(t => t.id !== newToast.id));
+//     }, 4000);
+//   };
 
-  const ToastContainer = () => (
-    <div className="fixed top-4 right-4 z-50 space-y-2">
-      {toasts.map(t => (
-        <div
-          key={t.id}
-          className={`p-4 rounded-lg shadow-lg max-w-sm ${
-            t.variant === 'destructive' 
-              ? 'bg-red-500 text-white' 
-              : 'bg-green-500 text-white'
-          }`}
-        >
-          <div className="font-semibold">{t.title}</div>
-          <div className="text-sm">{t.description}</div>
-        </div>
-      ))}
-    </div>
-  );
+//   const ToastContainer = () => (
+//     <div className="fixed top-4 right-4 z-50 space-y-2">
+//       {toasts.map(t => (
+//         <div
+//           key={t.id}
+//           className={`p-4 rounded-lg shadow-lg max-w-sm ${
+//             t.variant === 'destructive' 
+//               ? 'bg-red-500 text-white' 
+//               : 'bg-green-500 text-white'
+//           }`}
+//         >
+//           <div className="font-semibold">{t.title}</div>
+//           <div className="text-sm">{t.description}</div>
+//         </div>
+//       ))}
+//     </div>
+//   );
 
-  return { toast, ToastContainer };
-};
+//   return { toast, ToastContainer };
+// };
 
 // Mock navigate function
-const useNavigate = () => {
-  return (path) => {
-    console.log(`Would navigate to: ${path}`);
-    // In a real app, this would use react-router-dom navigation
-  };
-};
+// const useNavigate = () => {
+//   return (path) => {
+//     console.log(`Would navigate to: ${path}`);
+//     // In a real app, this would use react-router-dom navigation
+//   };
+// };
 
 // Mock Supabase client
 const mockSupabase = {
@@ -149,9 +154,11 @@ const Login = () => {
   const [fullName, setFullName] = useState('');
   const [loading, setLoading] = useState(false);
   const { signIn, signUp, user } = useAuth();
-  const navigate = useNavigate();
-  const { toast, ToastContainer } = useToast();
+  // const navigate = useNavigate();
+  // const { toast, ToastContainer } = useToast();
 
+
+  const navigate = useNavigate();
   const dispatch = useDispatch();
   const [login, {error}] = useLoginMutation()
 
@@ -224,62 +231,67 @@ const Login = () => {
     e.preventDefault();
     setLoading(true);
 
+    try {
+
     const credentials = { email, password }
     const response = await login(credentials).unwrap();
 
     if (response.error) {
-      toast({
-        title: "Login failed",
-        description: response.error.message,
-        variant: "destructive",
-      });
-      return;
-    } else {
-      toast({
-        title: "Welcome back! ✨",
-        description: "Redirecting to your dashboard...",
-      });
+      toast.error("Invalid email or password.")
       setLoading(false);
-    }
+      // return;
+    } else {
+      toast.success('Login successful.');
+      setLoading(false);  
+    } 
 
     const user = verifyToken(response.token);
     dispatch(setUser({user: user, token: response.token}));
-
-
+    navigate(`/${user.role.toLowerCase()}/dashboard`);
 
     setLoading(false);
+  
   }
-
-  const handleSignIn = async (e) => {
-    console.log("clicked")
-    e.preventDefault();
-    setLoading(true);
-    
-    try {
-      const { error } = await signIn(email, password);
-      
-      if (error) {
-        toast({
-          title: "Sign in failed",
-          description: error.message,
-          variant: "destructive",
-        });
-      } else {
-        toast({
-          title: "Welcome back! ✨",
-          description: "Redirecting to your dashboard...",
-        });
-      }
-    } catch (err) {
-      toast({
-        title: "Sign in failed",
-        description: "An unexpected error occurred",
-        variant: "destructive",
-      });
-    } finally {
+    catch (error) {
+      toast.error("something went wrong!");
       setLoading(false);
+      // return;
     }
-  };
+
+    
+    }
+
+
+  // const handleSignIn = async (e) => {
+  //   console.log("clicked")
+  //   e.preventDefault();
+  //   setLoading(true);
+    
+  //   try {
+  //     const { error } = await signIn(email, password);
+      
+  //     if (error) {
+  //       toast({
+  //         title: "Sign in failed",
+  //         description: error.message,
+  //         variant: "destructive",
+  //       });
+  //     } else {
+  //       toast({
+  //         title: "Welcome back! ✨",
+  //         description: "Redirecting to your dashboard...",
+  //       });
+  //     }
+  //   } catch (err) {
+  //     toast({
+  //       title: "Sign in failed",
+  //       description: "An unexpected error occurred",
+  //       variant: "destructive",
+  //     });
+  //   } finally {
+  //     setLoading(false);
+  //   }
+  // };
 
   const handleSignUp = async (e) => {
     e.preventDefault();
@@ -316,7 +328,7 @@ const Login = () => {
 
   return (
     <>
-      <ToastContainer />
+      {/* <ToastContainer /> */}
       <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-secondary/10 flex items-center justify-center p-4">
         <div className="w-full max-w-md">
           <div className="text-center mb-8">
@@ -337,6 +349,7 @@ const Login = () => {
                 <br />
                 <div className="text-xs text-muted-foreground mt-3 space-y-1">
                   <div><strong>Admin:</strong> admin@test.com / admin123</div>
+                  <div><strong>Admin-2:</strong> john@example3.com / securePassword1234</div>
                   <div><strong>Manager:</strong> manager@test.com / manager123</div>
                   <div><strong>Employee:</strong> employee@test.com / employee123</div>
                   <div><strong>Finance:</strong> finance@test.com / finance123</div>

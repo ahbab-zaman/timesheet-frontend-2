@@ -46,6 +46,9 @@ import {
   endOfMonth,
 } from "date-fns";
 import TaskManagement from "./TaskManagement";
+import { useDispatch } from "react-redux";
+import { logout } from "@/redux/features/auth/authSlice";
+import toast from "react-hot-toast";
 
 const AdminDashboard = () => {
   const [timesheets, setTimesheets] = useState([]);
@@ -62,6 +65,7 @@ const AdminDashboard = () => {
     end: endOfWeek(new Date(), { weekStartsOn: 1 }),
   });
   const [quickFilter, setQuickFilter] = useState("this-week");
+  const dispatch = useDispatch();
 
   useEffect(() => {
     // Simulate auth check
@@ -168,8 +172,9 @@ const AdminDashboard = () => {
   };
 
   const handleLogout = () => {
-    // Simulate sign out
-    // navigate("/attendance-timesheet");
+    dispatch(logout());
+    toast.success('Logout successful.');
+
   };
 
   if (loading) {
