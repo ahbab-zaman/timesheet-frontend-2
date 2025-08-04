@@ -6,17 +6,15 @@ import AdminDashboard from "@/pages/admin/AdminDashboard";
 import EmployeeManagement from "@/pages/admin/EmployeeManagement";
 import ManagerDashboard from "@/pages/manager/ManagerDashboard";
 import EmployeeDashboard from "@/pages/employee/EmployeeDashboard";
+import ProtectedRoute from "@/components/layout/ProtectedRoute";
+import RedirectToDashboard from "@/utils/RedirectToDashboard";
 
 const router = createBrowserRouter([
     {
         path: "/",
-        element: <App />,
-        children: [
-            {   
-                path: "about",
-                element: <About />,
-            }
-        ]
+        element: <ProtectedRoute>
+        <RedirectToDashboard/>
+      </ProtectedRoute>,
     },
     {
         path: "/admin",
