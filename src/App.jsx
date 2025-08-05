@@ -7,6 +7,7 @@ import MainLayout from "./components/layout/MainLayout";
 import EmployeeDashboard from "./pages/employee/EmployeeDashboard";
 import { Toaster } from "sonner";
 import ManagerDashboard from "./pages/manager/ManagerDashboard";
+import FinanceDashboard from "./pages/finance/FinanceDashboard";
 
 const App = () => {
   return (
@@ -17,8 +18,9 @@ const App = () => {
       {/* <EmployeeManagement /> */}
       {/* <h1>Timesheet Project</h1> */}
       {/* <MainLayout/> */}
-      <EmployeeDashboard />
+      {/* <EmployeeDashboard /> */}
       {/* <ManagerDashboard />*/}
+      <FinanceDashboard />
       <Toaster position="bottom-right" />
     </div>
   );
