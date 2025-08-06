@@ -46,6 +46,9 @@ import {
   endOfMonth,
 } from "date-fns";
 import ManagerTaskManagement from "./ManagerTaskManagement";
+import { useDispatch } from "react-redux";
+import { logout } from "@/redux/features/auth/authSlice";
+import toast from "react-hot-toast";
 
 const ManagerDashboard = () => {
   const [timesheets, setTimesheets] = useState([]);
@@ -62,6 +65,7 @@ const ManagerDashboard = () => {
     end: endOfWeek(new Date(), { weekStartsOn: 1 }),
   });
   const [quickFilter, setQuickFilter] = useState("this-week");
+  const dispatch = useDispatch();
 
   useEffect(() => {
     // Simulate auth check
@@ -168,8 +172,8 @@ const ManagerDashboard = () => {
   };
 
   const handleLogout = () => {
-    // Simulate sign out
-    // navigate("/attendance-timesheet");
+    dispatch(logout());
+    toast.success('Logout successful.');
   };
 
   if (loading) {
@@ -193,9 +197,7 @@ const ManagerDashboard = () => {
             </div>
             <div>
               <h1 className="text-2xl font-bold">
-                {userRole === "admin"
-                  ? "Manager Dashboard"
-                  : "Manager Dashboard"}
+                Manager Dashboard
               </h1>
               <p className="text-gray-500">
                 Manager's review helps keep project hours aligned ✅

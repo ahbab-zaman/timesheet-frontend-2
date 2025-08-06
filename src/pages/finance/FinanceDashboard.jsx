@@ -40,6 +40,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Edit2, FileText, DollarSign, AlertCircle } from "lucide-react";
+import { NavLink } from "react-router-dom";
 
 const FinanceDashboard = () => {
   const [activeTab, setActiveTab] = useState("overview");
@@ -276,10 +277,12 @@ const FinanceDashboard = () => {
   return (
     <div className="p-6 space-y-6">
       <div className="flex items-center gap-2">
+        {/* <NavLink to="/finance/dashboard">
         <Button variant="ghost" className="text-sm cursor-pointer">
           <ArrowLeft />
           Back to Home
         </Button>
+        </NavLink> */}
         <div>
           <h1 className="text-2xl font-bold">AIREPRO Finance Dashboard</h1>
           <p className="text-muted-foreground">

@@ -27,7 +27,7 @@ const router = createBrowserRouter([
         element: <AdminDashboard />,
       },
       {
-        path: "employee-management",
+        path: "dashboard/employee-management",
         element: <EmployeeManagement />,
       },
     ],

@@ -16,7 +16,6 @@ import {toast} from "react-hot-toast"
 
 // Dummy data to replace Supabase
 const dummyUsers = [
-  // { id: 1, email: 'admin@test.com', password: 'admin123', fullName: 'Admin User', role: 'admin' },
   { id: 1, email: 'john@example3.com', password: 'securePassword1234', fullName: 'Admin User', role: 'admin' },
   { id: 2, email: 'manager@test.com', password: 'manager123', fullName: 'Manager User', role: 'manager' },
   { id: 3, email: 'employee@test.com', password: 'employee123', fullName: 'Employee User', role: 'employee' },
@@ -349,7 +348,6 @@ const Login = () => {
                 <br />
                 <div className="text-xs text-muted-foreground mt-3 space-y-1">
                   <div><strong>Admin:</strong> admin@test.com / admin123</div>
-                  <div><strong>Admin-2:</strong> john@example3.com / securePassword1234</div>
                   <div><strong>Manager:</strong> manager@test.com / manager123</div>
                   <div><strong>Employee:</strong> employee@test.com / employee123</div>
                   <div><strong>Finance:</strong> finance@test.com / finance123</div>

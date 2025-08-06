@@ -49,6 +49,7 @@ import TaskManagement from "./TaskManagement";
 import { useDispatch } from "react-redux";
 import { logout } from "@/redux/features/auth/authSlice";
 import toast from "react-hot-toast";
+import { NavLink } from "react-router-dom";
 
 const AdminDashboard = () => {
   const [timesheets, setTimesheets] = useState([]);
@@ -198,18 +199,18 @@ const AdminDashboard = () => {
             </div>
             <div>
               <h1 className="text-2xl font-bold">
-                {userRole === "admin" ? "Admin Dashboard" : "Manager Dashboard"}
+              Admin Dashboard
               </h1>
               <p className="text-gray-500">
-                Manager's review helps keep project hours aligned ✅
+                Admin's review helps keep project hours aligned ✅
               </p>
             </div>
           </div>
           <div className="flex items-center gap-4">
-            <Button variant="outline" className="flex items-center gap-2">
+            <NavLink to="/admin/dashboard/employee-management"><Button variant="outline" className="flex items-center gap-2">
               <Settings className="h-4 w-4" />
               Employee Management
-            </Button>
+            </Button></NavLink>
             <Button variant="outline" onClick={handleLogout}>
               <LogOut className="h-4 w-4 mr-2" />
               Sign Out

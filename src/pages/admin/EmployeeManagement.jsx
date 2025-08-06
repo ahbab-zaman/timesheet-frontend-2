@@ -19,8 +19,13 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { Nav } from "react-day-picker";
+import { NavLink } from "react-router-dom";
+import { useSelector } from "react-redux";
+import { useCurrentUser } from "@/redux/features/auth/authSlice";
 
 const EmployeeManagement = () => {
+  const user = useSelector(useCurrentUser);
   const [open, setOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [search, setSearch] = useState("");
@@ -129,10 +134,12 @@ const EmployeeManagement = () => {
       {/* Header */}
       <div className="flex justify-between items-center">
         <div className="flex items-center gap-4">
+          <NavLink to={`/${user?.role?.toLowerCase()}/dashboard`}>
           <Button variant="ghost">
             <ArrowLeft />
             <span className="text-gray-600 font-medium">Back to Dashboard</span>
           </Button>
+          </NavLink>
           <div className="space-y-2">
             <h3 className="text-3xl font-bold text-gray-800">
               Employee Management
