@@ -49,6 +49,7 @@ import ManagerTaskManagement from "./ManagerTaskManagement";
 import { useDispatch } from "react-redux";
 import { logout } from "@/redux/features/auth/authSlice";
 import toast from "react-hot-toast";
+import ManagerLeave from "./ManagerLeave";
 
 const ManagerDashboard = () => {
   const [timesheets, setTimesheets] = useState([]);
@@ -173,7 +174,7 @@ const ManagerDashboard = () => {
 
   const handleLogout = () => {
     dispatch(logout());
-    toast.success('Logout successful.');
+    toast.success("Logout successful.");
   };
 
   if (loading) {
@@ -196,9 +197,7 @@ const ManagerDashboard = () => {
               <Users className="h-6 w-6 text-white" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold">
-                Manager Dashboard
-              </h1>
+              <h1 className="text-2xl font-bold">Manager Dashboard</h1>
               <p className="text-gray-500">
                 Manager's review helps keep project hours aligned ✅
               </p>
@@ -507,13 +506,17 @@ const ManagerDashboard = () => {
               );
             })()}
           </div>
-        ) : activeTab === "tasks" ? (
-          <div>
-            <ManagerTaskManagement />
-          </div>
         ) : (
-          <div className="bg-white rounded-lg shadow p-8 text-center">
-            Leave Approval Placeholder
+          activeTab === "tasks" && (
+            <div>
+              <ManagerTaskManagement />
+            </div>
+          )
+        )}
+
+        {activeTab === "leaves" && (
+          <div>
+            <ManagerLeave />
           </div>
         )}
       </div>
