@@ -50,6 +50,7 @@ import { useDispatch } from "react-redux";
 import { logout } from "@/redux/features/auth/authSlice";
 import toast from "react-hot-toast";
 import { NavLink } from "react-router-dom";
+import LeaveRequest from "./LeaveRequest";
 
 const AdminDashboard = () => {
   const [timesheets, setTimesheets] = useState([]);
@@ -174,8 +175,7 @@ const AdminDashboard = () => {
 
   const handleLogout = () => {
     dispatch(logout());
-    toast.success('Logout successful.');
-
+    toast.success("Logout successful.");
   };
 
   if (loading) {
@@ -198,19 +198,19 @@ const AdminDashboard = () => {
               <Users className="h-6 w-6 text-white" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold">
-              Admin Dashboard
-              </h1>
+              <h1 className="text-2xl font-bold">Admin Dashboard</h1>
               <p className="text-gray-500">
                 Admin's review helps keep project hours aligned ✅
               </p>
             </div>
           </div>
           <div className="flex items-center gap-4">
-            <NavLink to="/admin/dashboard/employee-management"><Button variant="outline" className="flex items-center gap-2">
-              <Settings className="h-4 w-4" />
-              Employee Management
-            </Button></NavLink>
+            <NavLink to="/admin/dashboard/employee-management">
+              <Button variant="outline" className="flex items-center gap-2">
+                <Settings className="h-4 w-4" />
+                Employee Management
+              </Button>
+            </NavLink>
             <Button variant="outline" onClick={handleLogout}>
               <LogOut className="h-4 w-4 mr-2" />
               Sign Out
@@ -324,202 +324,14 @@ const AdminDashboard = () => {
           )}
         </div>
 
-        {activeTab === "timesheets" ? (
-          <div className="grid gap-4">
-            {(() => {
-              const filteredTimesheets = timesheets.filter(
-                (timesheet) =>
-                  timesheet?.employees?.name
-                    ?.toLowerCase()
-                    .includes(employeeSearchTerm.toLowerCase()) ||
-                  timesheet?.employees?.email
-                    ?.toLowerCase()
-                    .includes(employeeSearchTerm.toLowerCase())
-              );
-              return filteredTimesheets.length === 0 ? (
-                <Card>
-                  <CardContent className="text-center py-8">
-                    <Clock className="h-12 w-12 mx-auto text-gray-500 mb-4" />
-                    <h3 className="text-lg font-medium mb-2">
-                      {filter === "submitted"
-                        ? "No timesheets for pending"
-                        : filter === "approved"
-                        ? "No timesheets for approved"
-                        : filter === "rejected"
-                        ? "No timesheets for rejected"
-                        : "No timesheets found"}
-                    </h3>
-                    <p className="text-gray-500">
-                      {filter === "submitted"
-                        ? "There are no pending timesheets to review."
-                        : filter === "approved"
-                        ? "There are no approved timesheets available."
-                        : filter === "rejected"
-                        ? "There are no rejected timesheets available."
-                        : `No ${filter} timesheets found.`}
-                    </p>
-                    {employeeSearchTerm && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setEmployeeSearchTerm("")}
-                        className="mt-2"
-                      >
-                        Clear Search
-                      </Button>
-                    )}
-                  </CardContent>
-                </Card>
-              ) : (
-                filteredTimesheets.map((timesheet) => {
-                  const isExpanded = expandedTimesheets[timesheet.id];
-                  return (
-                    <Card key={timesheet.id} className="overflow-hidden">
-                      <div
-                        className="flex justify-between items-center p-4 cursor-pointer hover:bg-gray-50 transition-colors border-b"
-                        onClick={() => toggleTimesheet(timesheet.id)}
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className="flex items-center gap-2">
-                            {isExpanded ? (
-                              <ChevronDown className="h-4 w-4 text-gray-500" />
-                            ) : (
-                              <ChevronRight className="h-4 w-4 text-gray-500" />
-                            )}
-                            <div>
-                              <div className="font-semibold text-sm">
-                                {timesheet.employees.name}
-                              </div>
-                              <div className="text-xs text-gray-500">
-                                {timesheet.employees.email}
-                              </div>
-                            </div>
-                          </div>
-                          <div className="hidden sm:block text-xs text-gray-500">
-                            Week:{" "}
-                            {format(
-                              new Date(timesheet.week_start_date),
-                              "MMM dd"
-                            )}{" "}
-                            -{" "}
-                            {format(
-                              new Date(timesheet.week_end_date),
-                              "dd, yyyy"
-                            )}
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          {getStatusBadge(timesheet.status)}
-                          <div className="text-right">
-                            <div className="text-lg font-bold">
-                              {timesheet.total_hours}h
-                            </div>
-                            <div className="text-xs text-gray-500">
-                              {format(
-                                new Date(timesheet.submitted_at),
-                                "MMM dd"
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                      {isExpanded && (
-                        <CardContent className="p-0">
-                          <div className="p-4 space-y-4">
-                            {timesheet.time_entries.length > 0 && (
-                              <div>
-                                <h4 className="font-medium mb-4">
-                                  Weekly Timesheet Grid:
-                                </h4>
-                                <TimesheetGrid timesheet={timesheet} />
-                              </div>
-                            )}
-                            {timesheet.comments && (
-                              <div>
-                                <h4 className="font-medium mb-2">Comments:</h4>
-                                <p className="text-sm text-gray-500 bg-gray-50 p-3 rounded">
-                                  {timesheet.comments}
-                                </p>
-                              </div>
-                            )}
-                            {timesheet.status === "submitted" && (
-                              <div className="flex gap-2 pt-4">
-                                <Button
-                                  onClick={() => handleApprove(timesheet.id)}
-                                >
-                                  <CheckCircle className="h-4 w-4 mr-2" />
-                                  Approve
-                                </Button>
-                                <Dialog>
-                                  <DialogTrigger asChild>
-                                    <Button
-                                      variant="destructive"
-                                      onClick={() =>
-                                        setSelectedTimesheet(timesheet)
-                                      }
-                                    >
-                                      <XCircle className="h-4 w-4 mr-2" />
-                                      Reject
-                                    </Button>
-                                  </DialogTrigger>
-                                  <DialogContent>
-                                    <DialogHeader>
-                                      <DialogTitle>
-                                        Reject Timesheet
-                                      </DialogTitle>
-                                      <DialogDescription>
-                                        Please provide feedback for{" "}
-                                        {timesheet.employees.name} about why
-                                        this timesheet is being rejected.
-                                      </DialogDescription>
-                                    </DialogHeader>
-                                    <div className="space-y-4">
-                                      <div>
-                                        <Label htmlFor="rejection-comment">
-                                          Feedback
-                                        </Label>
-                                        <Textarea
-                                          id="rejection-comment"
-                                          placeholder="Explain why this timesheet needs to be revised..."
-                                          value={rejectionComment}
-                                          onChange={(e) =>
-                                            setRejectionComment(e.target.value)
-                                          }
-                                        />
-                                      </div>
-                                      <div className="flex gap-2">
-                                        <Button
-                                          variant="destructive"
-                                          onClick={() =>
-                                            handleReject(timesheet.id)
-                                          }
-                                          disabled={!rejectionComment.trim()}
-                                        >
-                                          <MessageSquare className="h-4 w-4 mr-2" />
-                                          Send Rejection
-                                        </Button>
-                                      </div>
-                                    </div>
-                                  </DialogContent>
-                                </Dialog>
-                              </div>
-                            )}
-                          </div>
-                        </CardContent>
-                      )}
-                    </Card>
-                  );
-                })
-              );
-            })()}
-          </div>
-        ) : activeTab === "tasks" ? (
+        {activeTab === "tasks" && (
           <div>
             <TaskManagement />
           </div>
-        ) : (
-          <div className="bg-white rounded-lg shadow p-8 text-center">
-            Leave Approval Placeholder
+        )}
+        {activeTab === "leaves" && (
+          <div>
+            <LeaveRequest />
           </div>
         )}
       </div>
