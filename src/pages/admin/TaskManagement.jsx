@@ -19,6 +19,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
+import { Card, CardContent } from "@/components/ui/card";
 
 const TaskManagement = () => {
   const [tasks, setTasks] = useState([]);
@@ -216,10 +217,14 @@ const TaskManagement = () => {
         </div>
       </div>
       {tasks.length === 0 ? (
-        <div className="mt-6 text-center">
-          <Calendar className="h-12 w-12 mx-auto text-gray-500 mb-4" />
-          <h3 className="text-lg font-medium">No tasks found</h3>
-          <p className="text-gray-500">Create a task to get started.</p>
+        <div>
+          <Card className="flex flex-col items-center justify-center p-12 text-center border mt-4">
+            <Calendar className="h-12 w-12 mx-auto text-gray-500 mb-4" />
+            <CardContent className="text-center">
+              <h3 className="text-lg font-medium">No tasks found</h3>
+              <p className="text-gray-500">Create a task to get started.</p>
+            </CardContent>
+          </Card>
         </div>
       ) : (
         <div className="mt-6">

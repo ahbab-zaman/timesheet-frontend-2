@@ -50,6 +50,7 @@ import { useDispatch } from "react-redux";
 import { logout } from "@/redux/features/auth/authSlice";
 import toast from "react-hot-toast";
 import ManagerLeave from "./ManagerLeave";
+import Notification from "./Notification";
 
 const ManagerDashboard = () => {
   const [timesheets, setTimesheets] = useState([]);
@@ -204,6 +205,7 @@ const ManagerDashboard = () => {
             </div>
           </div>
           <div className="flex items-center gap-4">
+            <Notification />
             <Button variant="outline" onClick={handleLogout}>
               <LogOut className="h-4 w-4 mr-2" />
               Sign Out

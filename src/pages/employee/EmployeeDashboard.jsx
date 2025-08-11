@@ -37,6 +37,10 @@ import {
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
+import TimeTracker from "./TimeTracker";
+import EmployeeNotification from "./EmployeeNotification";
+import { useDispatch } from "react-redux";
+import { logout } from "@/redux/features/auth/authSlice";
 
 export default function EmployeeDashboard() {
   const [currentWeekStart, setCurrentWeekStart] = useState(
@@ -49,6 +53,7 @@ export default function EmployeeDashboard() {
   const [reason, setReason] = useState("");
   const [attachment, setAttachment] = useState();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const dispatch = useDispatch();
   const handlePreviousWeek = () => {
     setCurrentWeekStart((prev) => addDays(prev, -7));
   };
@@ -84,11 +89,19 @@ export default function EmployeeDashboard() {
     addDays(currentWeekStart, i)
   );
 
+  const handleLogout = () => {
+    dispatch(logout());
+    toast.success("Logout successful.");
+  };
+
   return (
     <div className="p-6 space-y-4">
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold">Timesheet</h1>
         <div className="flex items-center space-x-2">
+          <div>
+            <EmployeeNotification />
+          </div>
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
             <Input
@@ -189,8 +202,15 @@ export default function EmployeeDashboard() {
             </DialogContent>
           </Dialog>
 
-          <Button variant="destructive">Sign Out</Button>
+          <Button variant="outline" onClick={handleLogout}>
+            <LogOut />
+            Sign Out
+          </Button>
         </div>
+      </div>
+
+      <div>
+        <TimeTracker />
       </div>
 
       <div className="flex items-center justify-between">

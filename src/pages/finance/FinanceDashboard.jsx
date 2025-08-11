@@ -24,6 +24,7 @@ import {
   DownloadIcon,
   Gift,
   History,
+  LogOut,
   Receipt,
   Shield,
 } from "lucide-react";
@@ -41,6 +42,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Edit2, FileText, DollarSign, AlertCircle } from "lucide-react";
 import { NavLink } from "react-router-dom";
+import { useDispatch } from "react-redux";
+import { logout } from "@/redux/features/auth/authSlice";
+import { toast } from "sonner";
 
 const FinanceDashboard = () => {
   const [activeTab, setActiveTab] = useState("overview");
@@ -61,6 +65,7 @@ const FinanceDashboard = () => {
     account_holder_name: "",
     upi_id: "",
   });
+  const dispatch = useDispatch();
 
   const tabs = [
     "Overview",
@@ -274,6 +279,11 @@ const FinanceDashboard = () => {
     });
   };
 
+  const handleLogout = () => {
+    dispatch(logout());
+    toast.success("Logout successful.");
+  };
+
   return (
     <div className="p-6 space-y-6">
       <div className="flex items-center gap-2">
@@ -283,11 +293,19 @@ const FinanceDashboard = () => {
           Back to Home
         </Button>
         </NavLink> */}
-        <div>
-          <h1 className="text-2xl font-bold">AIREPRO Finance Dashboard</h1>
-          <p className="text-muted-foreground">
-            Manage employee payments and payroll
-          </p>
+        <div className="flex justify-between items-center w-full">
+          <div>
+            <h1 className="text-2xl font-bold">AIREPRO Finance Dashboard</h1>
+            <p className="text-muted-foreground">
+              Manage employee payments and payroll
+            </p>
+          </div>
+          <div>
+            <Button variant="outline" onClick={handleLogout}>
+              <LogOut />
+              Sign Out
+            </Button>
+          </div>
         </div>
       </div>
       {/* Filters */}
