@@ -35,6 +35,7 @@ import {
   ChevronDown,
   ChevronRight,
   CalendarDays,
+  Bell,
 } from "lucide-react";
 import {
   format,
@@ -51,6 +52,7 @@ import { logout } from "@/redux/features/auth/authSlice";
 import toast from "react-hot-toast";
 import { NavLink } from "react-router-dom";
 import LeaveRequest from "./LeaveRequest";
+import NotificationSystem from "./NotificationSystem";
 
 const AdminDashboard = () => {
   const [timesheets, setTimesheets] = useState([]);
@@ -73,21 +75,17 @@ const AdminDashboard = () => {
     // Simulate auth check
     const user = { id: "user1" }; // Mock user
     if (!user) {
-      // navigate("/attendance-timesheet");
       return;
     }
 
     // Simulate checking manager role
     const checkManagerRole = async () => {
       try {
-        // Mock role check
         const role = "manager"; // or 'admin'
         if (role !== "manager" && role !== "admin") {
-          // navigate("/attendance-timesheet");
           return;
         }
         setUserRole(role);
-        // Removed mockTimesheets assignment
         setLoading(false);
       } catch (error) {
         // navigate("/attendance-timesheet");
@@ -178,6 +176,22 @@ const AdminDashboard = () => {
     toast.success("Logout successful.");
   };
 
+  // Custom message based on filter
+  const getNoDataMessage = () => {
+    switch (filter) {
+      case "submitted":
+        return "No pending timesheets found";
+      case "approved":
+        return "No approved timesheets found";
+      case "rejected":
+        return "No rejected timesheets found";
+      case "all":
+        return "No timesheets found";
+      default:
+        return "No timesheets found";
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -205,6 +219,7 @@ const AdminDashboard = () => {
             </div>
           </div>
           <div className="flex items-center gap-4">
+            <NotificationSystem />
             <NavLink to="/admin/dashboard/employee-management">
               <Button variant="outline" className="flex items-center gap-2">
                 <Settings className="h-4 w-4" />
@@ -320,6 +335,29 @@ const AdminDashboard = () => {
                   </Button>
                 )}
               </div>
+
+              {/* No Data Message */}
+              {timesheets.length === 0 && (
+                <div>
+                  <Card className="flex flex-col items-center justify-center p-12 text-center border mt-4">
+                    <Clock className="h-12 w-12 mb-4 text-gray-400" />
+                    <CardContent className="text-center">
+                      <h2 className="text-lg font-semibold">
+                        {getNoDataMessage()}
+                      </h2>
+                      <p className="text-sm">
+                        {filter === "submitted"
+                          ? "No pending timesheets to review."
+                          : filter === "approved"
+                          ? "No approved timesheets available."
+                          : filter === "rejected"
+                          ? "No rejected timesheets available."
+                          : "No timesheets available."}
+                      </p>
+                    </CardContent>
+                  </Card>
+                </div>
+              )}
             </div>
           )}
         </div>
