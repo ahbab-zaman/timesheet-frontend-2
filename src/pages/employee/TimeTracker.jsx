@@ -9,12 +9,18 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { Play, Pause, Square, Clock } from "lucide-react";
+import { Play, Pause, Square, Clock, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 
 const TimeTracker = () => {
   const [isRunning, setIsRunning] = useState(false);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const [isOpen, setIsOpen] = useState(false); // CLOSED by default
   const [projects] = useState([
     { id: "1", name: "Website Redesign" },
     { id: "2", name: "Mobile App Development" },
@@ -136,117 +142,151 @@ const TimeTracker = () => {
   };
 
   return (
-    <Card className="w-full max-w-md mx-auto">
-      <CardContent className="p-6">
-        <div className="text-center mb-6">
-          <div className="flex items-center justify-center gap-2 mb-2">
-            <Clock className="h-5 w-5 text-primary" />
-            <h3 className="text-lg font-semibold">Time Tracker</h3>
-          </div>
-          <div className="text-3xl font-mono font-bold text-primary">
-            {formatTime(elapsedSeconds)}
-          </div>
-          {isRunning && (
-            <div className="text-sm text-green-600 mt-1">● Recording...</div>
-          )}
-        </div>
+    <Card className="w-ful mx-auto rounded-lg border">
+      <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+        {/* Header (clickable) */}
+        <CollapsibleTrigger asChild>
+          <div
+            className="flex items-center justify-between px-6 py-4 cursor-pointer"
+            aria-hidden
+          >
+            <div className="flex items-center gap-3">
+              <Clock className="h-5 w-5 text-primary" />
+              <h3 className="text-lg font-semibold">Time Tracker</h3>
+            </div>
 
-        <div className="space-y-4">
-          <div>
-            <label className="text-sm font-medium mb-2 block">Project</label>
-            <Select
-              value={selectedProject}
-              onValueChange={setSelectedProject}
-              disabled={isRunning}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select project" />
-              </SelectTrigger>
-              <SelectContent>
-                {projects.map((project) => (
-                  <SelectItem key={project.id} value={project.id}>
-                    {project.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div>
-            <label className="text-sm font-medium mb-2 block">Task</label>
-            <Select
-              value={selectedTask}
-              onValueChange={setSelectedTask}
-              disabled={isRunning || !selectedProject}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select task" />
-              </SelectTrigger>
-              <SelectContent>
-                {tasks.map((task) => (
-                  <SelectItem key={task.id} value={task.id}>
-                    {task.task_title}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div>
-            <label className="text-sm font-medium mb-2 block">
-              Description
-            </label>
-            <Input
-              placeholder="What are you working on?"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              disabled={isRunning}
+            {/* single chevron that rotates */}
+            <ChevronDown
+              className={`h-5 w-5 transition-transform duration-200 ${
+                isOpen ? "rotate-180" : "rotate-0"
+              }`}
             />
           </div>
+        </CollapsibleTrigger>
 
-          <div className="flex gap-2 justify-center pt-4">
-            {!activeSession ? (
-              <Button
-                onClick={startTimer}
-                className="flex items-center gap-2"
-                disabled={!selectedProject || !selectedTask}
-              >
-                <Play className="h-4 w-4" />
-                Start
-              </Button>
-            ) : (
-              <>
-                {isRunning ? (
-                  <Button
-                    onClick={pauseTimer}
-                    variant="outline"
-                    className="flex items-center gap-2"
-                  >
-                    <Pause className="h-4 w-4" />
-                    Pause
-                  </Button>
-                ) : (
-                  <Button
-                    onClick={resumeTimer}
-                    className="flex items-center gap-2"
-                  >
-                    <Play className="h-4 w-4" />
-                    Resume
-                  </Button>
+        {/* Smooth animated wrapper using max-height + opacity */}
+        <CollapsibleContent asChild>
+          <div
+            className={`overflow-hidden transition-all duration-500 ease-in-out ${
+              isOpen ? "max-h-[1200px] opacity-100" : "max-h-0 opacity-0"
+            }`}
+          >
+            <CardContent className="p-6">
+              <div className="text-center mb-6">
+                <div className="flex items-center justify-center gap-2 mb-2">
+                  {/* Clock icon already in header; keeping layout similar */}
+                </div>
+                <div className="text-3xl font-mono font-bold text-primary">
+                  {formatTime(elapsedSeconds)}
+                </div>
+                {isRunning && (
+                  <div className="text-sm text-green-600 mt-1">
+                    ● Recording...
+                  </div>
                 )}
-                <Button
-                  onClick={stopTimer}
-                  variant="destructive"
-                  className="flex items-center gap-2"
-                >
-                  <Square className="h-4 w-4" />
-                  Stop
-                </Button>
-              </>
-            )}
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="text-sm font-medium mb-2 block">
+                    Project
+                  </label>
+                  <Select
+                    value={selectedProject}
+                    onValueChange={setSelectedProject}
+                    disabled={isRunning}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select project" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {projects.map((project) => (
+                        <SelectItem key={project.id} value={project.id}>
+                          {project.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium mb-2 block">Task</label>
+                  <Select
+                    value={selectedTask}
+                    onValueChange={setSelectedTask}
+                    disabled={isRunning || !selectedProject}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select task" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {tasks.map((task) => (
+                        <SelectItem key={task.id} value={task.id}>
+                          {task.task_title}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium mb-2 block">
+                    Description
+                  </label>
+                  <Input
+                    placeholder="What are you working on?"
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    disabled={isRunning}
+                  />
+                </div>
+
+                <div className="flex gap-2 justify-center pt-4">
+                  {!activeSession ? (
+                    <Button
+                      onClick={startTimer}
+                      className="flex items-center gap-2"
+                      disabled={!selectedProject || !selectedTask}
+                    >
+                      <Play className="h-4 w-4" />
+                      Start
+                    </Button>
+                  ) : (
+                    <>
+                      {isRunning ? (
+                        <Button
+                          onClick={pauseTimer}
+                          variant="outline"
+                          className="flex items-center gap-2"
+                        >
+                          <Pause className="h-4 w-4" />
+                          Pause
+                        </Button>
+                      ) : (
+                        <Button
+                          onClick={resumeTimer}
+                          className="flex items-center gap-2"
+                        >
+                          <Play className="h-4 w-4" />
+                          Resume
+                        </Button>
+                      )}
+                      <Button
+                        onClick={stopTimer}
+                        variant="destructive"
+                        className="flex items-center gap-2"
+                      >
+                        <Square className="h-4 w-4" />
+                        Stop
+                      </Button>
+                    </>
+                  )}
+                </div>
+              </div>
+            </CardContent>
           </div>
-        </div>
-      </CardContent>
+        </CollapsibleContent>
+      </Collapsible>
     </Card>
   );
 };
