@@ -1,18 +1,11 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+// import { useAuth } from "@/hooks/useAuth";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -20,155 +13,349 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { toast } from "@/hooks/use-toast";
+import NotificationSystem from "./NotificationSystem";
+import TimesheetApproval from "../../components/TimesheetApproval";
+import ProjectAssignmentComponent from "../../components/ProjectAssignmentComponent";
+import AdminAnalytics from "../../components/AdminAnalytics";
+import TimeLogs from "../../components/TimeLogs";
+import ApprovalRules from "../../components/ApprovalRules";
+import ExportFunctionality from "../../components/ExportFunctionality";
+import EmployeeRoleManagement from "../../components/EmployeeRoleManagement ";
+import BillableTagsSystem from "../../components/BillableTagsSystem";
+import HolidayLeaveCalendar from "../../components/HolidayLeaveCalendar";
+import TimesheetBackupRestore from "../../components/TimesheetBackupRestore";
+import DuplicateBillingDetection from "../../components/DuplicateBillingDetection";
 import {
   Users,
-  Clock,
-  LogOut,
-  CheckCircle,
-  XCircle,
-  Filter,
-  MessageSquare,
+  FolderPlus,
+  DollarSign,
   Settings,
+  Edit,
+  Trash2,
   Plus,
+  UserPlus,
   Calendar,
-  Search,
-  ChevronDown,
-  ChevronRight,
-  CalendarDays,
-  Bell,
+  Clock,
+  TrendingUp,
+  AlertCircle,
+  BarChart3,
+  Target,
+  CheckCircle,
+  LogOut,
 } from "lucide-react";
-import {
-  format,
-  startOfWeek,
-  endOfWeek,
-  addDays,
-  subDays,
-  startOfMonth,
-  endOfMonth,
-} from "date-fns";
-import TaskManagement from "./TaskManagement";
 import { useDispatch } from "react-redux";
 import { logout } from "@/redux/features/auth/authSlice";
-import toast from "react-hot-toast";
-import { NavLink } from "react-router-dom";
-import LeaveRequest from "./LeaveRequest";
-import NotificationSystem from "./NotificationSystem";
 
 const AdminDashboard = () => {
-  const [timesheets, setTimesheets] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [selectedTimesheet, setSelectedTimesheet] = useState(null);
-  const [rejectionComment, setRejectionComment] = useState("");
-  const [filter, setFilter] = useState("submitted");
-  const [userRole, setUserRole] = useState(null);
-  const [activeTab, setActiveTab] = useState("timesheets");
-  const [employeeSearchTerm, setEmployeeSearchTerm] = useState("");
-  const [expandedTimesheets, setExpandedTimesheets] = useState({});
-  const [dateRange, setDateRange] = useState({
-    start: startOfWeek(new Date(), { weekStartsOn: 1 }),
-    end: endOfWeek(new Date(), { weekStartsOn: 1 }),
-  });
-  const [quickFilter, setQuickFilter] = useState("this-week");
-  const dispatch = useDispatch();
+  // const { user } = useAuth();
+  const navigate = useNavigate();
 
+  const [projects, setProjects] = useState([]);
+  const [employees, setEmployees] = useState([]);
+  const [rates, setRates] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  // Form states
+  const [newProject, setNewProject] = useState({
+    name: "",
+    description: "",
+    status: "active",
+    start_date: "",
+    end_date: "",
+  });
+
+  const [newEmployee, setNewEmployee] = useState({
+    name: "",
+    email: "",
+    department: "",
+    position: "",
+    employee_id: "",
+  });
+
+  const [rateForm, setRateForm] = useState({
+    employee_id: "",
+    hourly_rate: "",
+    currency: "INR",
+  });
+
+  const [activeTab, setActiveTab] = useState("overview");
+  const [showProjectDialog, setShowProjectDialog] = useState(false);
+  const [showEmployeeDialog, setShowEmployeeDialog] = useState(false);
+  const [showRateDialog, setShowRateDialog] = useState(false);
+  const [editingProject, setEditingProject] = useState(null);
+  const dispatch = useDispatch();
   useEffect(() => {
-    // Simulate auth check
-    const user = { id: "user1" }; // Mock user
-    if (!user) {
+    checkAdminRole();
+    fetchData();
+  }, []);
+
+  const checkAdminRole = async () => {
+    if (!user) return;
+
+    const role = "admin"; // Mock role check
+    if (role !== "admin") {
+      navigate("/access-denied");
+    }
+  };
+
+  const fetchData = async () => {
+    try {
+      // Mock data fetch
+      setProjects([
+        {
+          id: "1",
+          name: "Project 1",
+          description: "Description 1",
+          status: "active",
+          start_date: "2025-01-01",
+          end_date: "2025-12-31",
+          created_at: "2025-01-01",
+        },
+        {
+          id: "2",
+          name: "Project 2",
+          description: "Description 2",
+          status: "completed",
+          start_date: "2025-02-01",
+          end_date: "2025-06-30",
+          created_at: "2025-02-01",
+        },
+      ]);
+      setEmployees([
+        {
+          id: "1",
+          name: "John Doe",
+          email: "john@example.com",
+          department: "IT",
+          position: "Developer",
+          status: "active",
+          employee_id: "EMP001",
+        },
+        {
+          id: "2",
+          name: "Jane Smith",
+          email: "jane@example.com",
+          department: "HR",
+          position: "Manager",
+          status: "active",
+          employee_id: "EMP002",
+        },
+      ]);
+      setRates([
+        {
+          id: "1",
+          employee_id: "1",
+          hourly_rate: 50,
+          currency: "INR",
+          effective_from: "2025-01-01",
+        },
+        {
+          id: "2",
+          employee_id: "2",
+          hourly_rate: 75,
+          currency: "INR",
+          effective_from: "2025-02-01",
+        },
+      ]);
+    } catch (error) {
+      console.error("Error fetching data:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load dashboard data",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const createProject = async () => {
+    if (!newProject.name.trim()) {
+      toast({
+        title: "Error",
+        description: "Project name is required",
+        variant: "destructive",
+      });
       return;
     }
 
-    // Simulate checking manager role
-    const checkManagerRole = async () => {
-      try {
-        const role = "manager"; // or 'admin'
-        if (role !== "manager" && role !== "admin") {
-          return;
-        }
-        setUserRole(role);
-        setLoading(false);
-      } catch (error) {
-        // navigate("/attendance-timesheet");
-      }
-    };
+    try {
+      const newProj = {
+        id: Date.now().toString(),
+        ...newProject,
+        created_at: new Date().toISOString().split("T")[0],
+      };
+      setProjects([newProj, ...projects]);
+      setNewProject({
+        name: "",
+        description: "",
+        status: "active",
+        start_date: "",
+        end_date: "",
+      });
+      setShowProjectDialog(false);
 
-    checkManagerRole();
-  }, []);
-
-  const handleQuickFilter = (value) => {
-    setQuickFilter(value);
-    const now = new Date();
-    switch (value) {
-      case "this-week":
-        setDateRange({
-          start: startOfWeek(now, { weekStartsOn: 1 }),
-          end: endOfWeek(now, { weekStartsOn: 1 }),
-        });
-        break;
-      case "last-week":
-        setDateRange({
-          start: startOfWeek(subDays(now, 7), { weekStartsOn: 1 }),
-          end: endOfWeek(subDays(now, 7), { weekStartsOn: 1 }),
-        });
-        break;
-      case "last-30-days":
-        setDateRange({
-          start: subDays(now, 30),
-          end: now,
-        });
-        break;
-      case "this-month":
-        setDateRange({
-          start: startOfMonth(now),
-          end: endOfMonth(now),
-        });
-        break;
-      default:
-        break;
+      toast({
+        title: "Success",
+        description: "Project created successfully",
+      });
+    } catch (error) {
+      console.error("Error creating project:", error);
+      toast({
+        title: "Error",
+        description: "Failed to create project",
+        variant: "destructive",
+      });
     }
   };
 
-  const handleApprove = (timesheetId) => {
-    setTimesheets((prev) =>
-      prev.map((t) =>
-        t.id === timesheetId
-          ? { ...t, status: "approved", approved_at: new Date().toISOString() }
-          : t
-      )
-    );
-    alert("Timesheet approved! ✅");
+  const updateProject = async () => {
+    if (!editingProject) return;
+
+    try {
+      const updatedProj = {
+        ...newProject,
+        id: editingProject.id,
+        created_at: editingProject.created_at,
+      };
+      setProjects(
+        projects.map((p) => (p.id === editingProject.id ? updatedProj : p))
+      );
+      setEditingProject(null);
+      setShowProjectDialog(false);
+
+      toast({
+        title: "Success",
+        description: "Project updated successfully",
+      });
+    } catch (error) {
+      console.error("Error updating project:", error);
+      toast({
+        title: "Error",
+        description: "Failed to update project",
+        variant: "destructive",
+      });
+    }
   };
 
-  const handleReject = (timesheetId) => {
-    if (!rejectionComment.trim()) return;
-    setTimesheets((prev) =>
-      prev.map((t) =>
-        t.id === timesheetId
-          ? { ...t, status: "rejected", comments: rejectionComment }
-          : t
-      )
-    );
-    alert("Timesheet rejected");
-    setRejectionComment("");
-    setSelectedTimesheet(null);
+  const deleteProject = async (projectId) => {
+    try {
+      setProjects(projects.filter((p) => p.id !== projectId));
+
+      toast({
+        title: "Success",
+        description: "Project deleted successfully",
+      });
+    } catch (error) {
+      console.error("Error deleting project:", error);
+      toast({
+        title: "Error",
+        description: "Failed to delete project",
+        variant: "destructive",
+      });
+    }
   };
 
-  const getStatusBadge = (status) => {
-    const variants = {
-      submitted: { variant: "secondary", label: "🟡 Pending" },
-      approved: { variant: "default", label: "✅ Approved" },
-      rejected: { variant: "destructive", label: "🔴 Rejected" },
-      draft: { variant: "outline", label: "Draft" },
-    };
-    const config = variants[status] || variants.draft;
-    return <Badge variant={config.variant}>{config.label}</Badge>;
+  const createEmployee = async () => {
+    if (!newEmployee.name.trim() || !newEmployee.email.trim()) {
+      toast({
+        title: "Error",
+        description: "Name and email are required",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const newEmp = {
+        id: Date.now().toString(),
+        ...newEmployee,
+        status: "active",
+      };
+      setEmployees([newEmp, ...employees]);
+      setNewEmployee({
+        name: "",
+        email: "",
+        department: "",
+        position: "",
+        employee_id: "",
+      });
+      setShowEmployeeDialog(false);
+
+      toast({
+        title: "Success",
+        description: "Employee created successfully",
+      });
+    } catch (error) {
+      console.error("Error creating employee:", error);
+      toast({
+        title: "Error",
+        description: "Failed to create employee",
+        variant: "destructive",
+      });
+    }
   };
 
-  const toggleTimesheet = (timesheetId) => {
-    setExpandedTimesheets((prev) => ({
-      ...prev,
-      [timesheetId]: !prev[timesheetId],
-    }));
+  const setEmployeeRate = async () => {
+    if (!rateForm.employee_id || !rateForm.hourly_rate) {
+      toast({
+        title: "Error",
+        description: "Employee and rate are required",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const newRate = {
+        id: Date.now().toString(),
+        employee_id: rateForm.employee_id,
+        hourly_rate: parseFloat(rateForm.hourly_rate),
+        currency: rateForm.currency,
+        effective_from: new Date().toISOString().split("T")[0],
+      };
+      setRates([newRate, ...rates]);
+      setRateForm({
+        employee_id: "",
+        hourly_rate: "",
+        currency: "INR",
+      });
+      setShowRateDialog(false);
+
+      toast({
+        title: "Success",
+        description: "Employee rate set successfully",
+      });
+    } catch (error) {
+      console.error("Error setting rate:", error);
+      toast({
+        title: "Error",
+        description: "Failed to set employee rate",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const openEditProject = (project) => {
+    setEditingProject(project);
+    setNewProject({
+      name: project.name,
+      description: project.description || "",
+      status: project.status,
+      start_date: project.start_date || "",
+      end_date: project.end_date || "",
+    });
+    setShowProjectDialog(true);
   };
 
   const handleLogout = () => {
@@ -176,202 +363,595 @@ const AdminDashboard = () => {
     toast.success("Logout successful.");
   };
 
-  // Custom message based on filter
-  const getNoDataMessage = () => {
-    switch (filter) {
-      case "submitted":
-        return "No pending timesheets found";
-      case "approved":
-        return "No approved timesheets found";
-      case "rejected":
-        return "No rejected timesheets found";
-      case "all":
-        return "No timesheets found";
-      default:
-        return "No timesheets found";
-    }
-  };
-
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
-          <Clock className="h-8 w-8 animate-spin mx-auto mb-4" />
-          <p>Loading timesheets...</p>
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary mx-auto"></div>
+          <p className="mt-4 text-muted-foreground">
+            Loading admin dashboard...
+          </p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-gray-100">
-      <div className="w-full mx-auto p-6">
-        <div className="flex justify-between items-center mb-8">
-          <div className="flex items-center gap-3">
-            <div className="bg-black rounded-full p-2">
-              <Users className="h-6 w-6 text-white" />
-            </div>
+    <div className="min-h-screen bg-background">
+      {/* Header */}
+      <div className="border-b bg-card">
+        <div className="mx-auto px-4 py-4">
+          <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-2xl font-bold">Admin Dashboard</h1>
-              <p className="text-gray-500">
-                Admin's review helps keep project hours aligned ✅
+              <h1 className="text-2xl font-bold text-foreground">
+                Admin Dashboard
+              </h1>
+              <p className="text-muted-foreground">
+                Manage projects, employees, and rates
               </p>
             </div>
-          </div>
-          <div className="flex items-center gap-4">
-            <NotificationSystem />
-            <NavLink to="/admin/dashboard/employee-management">
-              <Button variant="outline" className="flex items-center gap-2">
-                <Settings className="h-4 w-4" />
-                Employee Management
+            <div>
+              <Button variant="outline" onClick={handleLogout}>
+                <LogOut />
+                Sign Out
               </Button>
-            </NavLink>
-            <Button variant="outline" onClick={handleLogout}>
-              <LogOut className="h-4 w-4 mr-2" />
-              Sign Out
-            </Button>
+              <NotificationSystem />
+            </div>
           </div>
         </div>
+      </div>
 
-        <div className="mb-6">
-          <div className="flex gap-4 items-center">
-            <div className="flex gap-2">
-              <Button
-                variant={activeTab === "timesheets" ? "default" : "outline"}
-                onClick={() => setActiveTab("timesheets")}
+      <div className="mx-auto px-4 py-6">
+        {/* Overview Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">
+                    Total Projects
+                  </p>
+                  <p className="text-2xl font-bold text-foreground">
+                    {projects.length}
+                  </p>
+                </div>
+                <FolderPlus className="h-8 w-8 text-primary" />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">
+                    Total Employees
+                  </p>
+                  <p className="text-2xl font-bold text-foreground">
+                    {employees.length}
+                  </p>
+                </div>
+                <Users className="h-8 w-8 text-primary" />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">
+                    Active Projects
+                  </p>
+                  <p className="text-2xl font-bold text-foreground">
+                    {projects.filter((p) => p.status === "active").length}
+                  </p>
+                </div>
+                <TrendingUp className="h-8 w-8 text-primary" />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">
+                    Rate Configs
+                  </p>
+                  <p className="text-2xl font-bold text-foreground">
+                    {rates.length}
+                  </p>
+                </div>
+                <DollarSign className="h-8 w-8 text-primary" />
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Main Content */}
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <TabsList className="grid w-full grid-cols-8 md:grid-cols-4 lg:grid-cols-8">
+            <TabsTrigger value="overview">Overview</TabsTrigger>
+            <TabsTrigger value="timesheets">Timesheets</TabsTrigger>
+            <TabsTrigger value="projects">Projects</TabsTrigger>
+            <TabsTrigger value="assignments">Assignments</TabsTrigger>
+            <TabsTrigger value="employees">Employees</TabsTrigger>
+            <TabsTrigger value="analytics">Analytics</TabsTrigger>
+            <TabsTrigger value="advanced">Advanced</TabsTrigger>
+            <TabsTrigger value="admin">Admin Tools</TabsTrigger>
+          </TabsList>
+
+          {/* Overview Tab */}
+          <TabsContent value="overview" className="space-y-6">
+            <div className="text-center py-8">
+              <h2 className="text-xl font-semibold mb-4">Admin Overview</h2>
+              <p className="text-muted-foreground">
+                Use the tabs above to manage different aspects of the system.
+              </p>
+            </div>
+          </TabsContent>
+
+          {/* Timesheets Tab */}
+          <TabsContent value="timesheets" className="space-y-6">
+            <TimesheetApproval userRole="admin" />
+          </TabsContent>
+
+          {/* Projects Tab */}
+          <TabsContent value="projects" className="space-y-6">
+            <div className="flex justify-between items-center">
+              <h2 className="text-xl font-semibold text-foreground">
+                Projects
+              </h2>
+              <Dialog
+                open={showProjectDialog}
+                onOpenChange={setShowProjectDialog}
               >
-                <Clock className="h-4 w-4 mr-2" />
-                Timesheets
-              </Button>
-              <Button
-                variant={activeTab === "tasks" ? "default" : "outline"}
-                onClick={() => setActiveTab("tasks")}
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Task Management
-              </Button>
-              <Button
-                variant={activeTab === "leaves" ? "default" : "outline"}
-                onClick={() => setActiveTab("leaves")}
-              >
-                <Calendar className="h-4 w-4 mr-2" />
-                Leave Requests
-              </Button>
+                <DialogTrigger asChild>
+                  <Button onClick={() => setEditingProject(null)}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    New Project
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>
+                      {editingProject ? "Edit Project" : "Create New Project"}
+                    </DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4">
+                    <div>
+                      <Label htmlFor="project-name">Project Name</Label>
+                      <Input
+                        id="project-name"
+                        value={newProject.name}
+                        onChange={(e) =>
+                          setNewProject({ ...newProject, name: e.target.value })
+                        }
+                        placeholder="Enter project name"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="project-description">Description</Label>
+                      <Textarea
+                        id="project-description"
+                        value={newProject.description}
+                        onChange={(e) =>
+                          setNewProject({
+                            ...newProject,
+                            description: e.target.value,
+                          })
+                        }
+                        placeholder="Enter project description"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label htmlFor="start-date">Start Date</Label>
+                        <Input
+                          id="start-date"
+                          type="date"
+                          value={newProject.start_date}
+                          onChange={(e) =>
+                            setNewProject({
+                              ...newProject,
+                              start_date: e.target.value,
+                            })
+                          }
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="end-date">End Date</Label>
+                        <Input
+                          id="end-date"
+                          type="date"
+                          value={newProject.end_date}
+                          onChange={(e) =>
+                            setNewProject({
+                              ...newProject,
+                              end_date: e.target.value,
+                            })
+                          }
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <Label htmlFor="project-status">Status</Label>
+                      <Select
+                        value={newProject.status}
+                        onValueChange={(value) =>
+                          setNewProject({ ...newProject, status: value })
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="active">Active</SelectItem>
+                          <SelectItem value="completed">Completed</SelectItem>
+                          <SelectItem value="on-hold">On Hold</SelectItem>
+                          <SelectItem value="cancelled">Cancelled</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <Button
+                      onClick={editingProject ? updateProject : createProject}
+                      className="w-full"
+                    >
+                      {editingProject ? "Update Project" : "Create Project"}
+                    </Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
             </div>
 
-            {activeTab === "timesheets" && (
-              <>
-                <div className="flex gap-2">
-                  <Button
-                    variant={filter === "submitted" ? "default" : "outline"}
-                    onClick={() => setFilter("submitted")}
-                    size="sm"
-                  >
-                    <Filter className="h-4 w-4 mr-2" />
-                    Pending (
-                    {timesheets.filter((t) => t.status === "submitted").length})
-                  </Button>
-                  <Button
-                    variant={filter === "approved" ? "default" : "outline"}
-                    onClick={() => setFilter("approved")}
-                    size="sm"
-                  >
-                    Approved
-                  </Button>
-                  <Button
-                    variant={filter === "rejected" ? "default" : "outline"}
-                    onClick={() => setFilter("rejected")}
-                    size="sm"
-                  >
-                    Rejected
-                  </Button>
-                  <Button
-                    variant={filter === "all" ? "default" : "outline"}
-                    onClick={() => setFilter("all")}
-                    size="sm"
-                  >
-                    All
-                  </Button>
-                </div>
-                <div className="flex items-center gap-2">
-                  <CalendarDays className="h-4 w-4 text-gray-500" />
-                  <Select value={quickFilter} onValueChange={handleQuickFilter}>
-                    <SelectTrigger className="w-40">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="this-week">This Week</SelectItem>
-                      <SelectItem value="last-week">Last Week</SelectItem>
-                      <SelectItem value="this-month">This Month</SelectItem>
-                      <SelectItem value="last-30-days">Last 30 Days</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <div className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
-                    {format(dateRange.start, "MMM dd")} -{" "}
-                    {format(dateRange.end, "MMM dd, yyyy")}
-                  </div>
-                </div>
-              </>
-            )}
-          </div>
-          {activeTab === "timesheets" && (
-            <div className="p-4">
-              <div className="flex justify-center items-center gap-2">
-                <Search className="h-4 w-4 text-gray-500" />
-                <Input
-                  placeholder="Search by employee name..."
-                  value={employeeSearchTerm}
-                  onChange={(e) => setEmployeeSearchTerm(e.target.value)}
-                  className="w-64"
-                />
-                {employeeSearchTerm && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setEmployeeSearchTerm("")}
-                    className="text-xs"
-                  >
-                    Clear
-                  </Button>
-                )}
-              </div>
+            <div className="grid gap-4">
+              {projects.map((project) => (
+                <Card key={project.id}>
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-lg">{project.name}</CardTitle>
+                      <div className="flex items-center gap-2">
+                        <Badge
+                          variant={
+                            project.status === "active"
+                              ? "default"
+                              : "secondary"
+                          }
+                        >
+                          {project.status}
+                        </Badge>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => openEditProject(project)}
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => deleteProject(project.id)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-muted-foreground mb-2">
+                      {project.description}
+                    </p>
+                    <div className="flex gap-4 text-sm text-muted-foreground">
+                      {project.start_date && (
+                        <span className="flex items-center gap-1">
+                          <Calendar className="h-3 w-3" />
+                          Start:{" "}
+                          {new Date(project.start_date).toLocaleDateString()}
+                        </span>
+                      )}
+                      {project.end_date && (
+                        <span className="flex items-center gap-1">
+                          <Calendar className="h-3 w-3" />
+                          End: {new Date(project.end_date).toLocaleDateString()}
+                        </span>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </TabsContent>
 
-              {/* No Data Message */}
-              {timesheets.length === 0 && (
-                <div>
-                  <Card className="flex flex-col items-center justify-center p-12 text-center border mt-4">
-                    <Clock className="h-12 w-12 mb-4 text-gray-400" />
-                    <CardContent className="text-center">
-                      <h2 className="text-lg font-semibold">
-                        {getNoDataMessage()}
-                      </h2>
-                      <p className="text-sm">
-                        {filter === "submitted"
-                          ? "No pending timesheets to review."
-                          : filter === "approved"
-                          ? "No approved timesheets available."
-                          : filter === "rejected"
-                          ? "No rejected timesheets available."
-                          : "No timesheets available."}
-                      </p>
+          {/* Assignments Tab */}
+          <TabsContent value="assignments" className="space-y-6">
+            <ProjectAssignmentComponent />
+          </TabsContent>
+
+          {/* Employees Tab */}
+          <TabsContent value="employees" className="space-y-6">
+            <div className="flex justify-between items-center">
+              <h2 className="text-xl font-semibold text-foreground">
+                Employees
+              </h2>
+              <Dialog
+                open={showEmployeeDialog}
+                onOpenChange={setShowEmployeeDialog}
+              >
+                <DialogTrigger asChild>
+                  <Button>
+                    <UserPlus className="h-4 w-4 mr-2" />
+                    Add Employee
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Add New Employee</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4">
+                    <div>
+                      <Label htmlFor="emp-name">Full Name</Label>
+                      <Input
+                        id="emp-name"
+                        value={newEmployee.name}
+                        onChange={(e) =>
+                          setNewEmployee({
+                            ...newEmployee,
+                            name: e.target.value,
+                          })
+                        }
+                        placeholder="Enter full name"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="emp-email">Email</Label>
+                      <Input
+                        id="emp-email"
+                        type="email"
+                        value={newEmployee.email}
+                        onChange={(e) =>
+                          setNewEmployee({
+                            ...newEmployee,
+                            email: e.target.value,
+                          })
+                        }
+                        placeholder="Enter email address"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="emp-id">Employee ID</Label>
+                      <Input
+                        id="emp-id"
+                        value={newEmployee.employee_id}
+                        onChange={(e) =>
+                          setNewEmployee({
+                            ...newEmployee,
+                            employee_id: e.target.value,
+                          })
+                        }
+                        placeholder="Enter employee ID"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label htmlFor="emp-dept">Department</Label>
+                        <Input
+                          id="emp-dept"
+                          value={newEmployee.department}
+                          onChange={(e) =>
+                            setNewEmployee({
+                              ...newEmployee,
+                              department: e.target.value,
+                            })
+                          }
+                          placeholder="Enter department"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="emp-position">Position</Label>
+                        <Input
+                          id="emp-position"
+                          value={newEmployee.position}
+                          onChange={(e) =>
+                            setNewEmployee({
+                              ...newEmployee,
+                              position: e.target.value,
+                            })
+                          }
+                          placeholder="Enter position"
+                        />
+                      </div>
+                    </div>
+                    <Button onClick={createEmployee} className="w-full">
+                      Add Employee
+                    </Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
+            </div>
+
+            <div className="grid gap-4">
+              {employees.map((employee) => (
+                <Card key={employee.id}>
+                  <CardContent className="p-6">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h3 className="font-semibold text-foreground">
+                          {employee.name}
+                        </h3>
+                        <p className="text-sm text-muted-foreground">
+                          {employee.email}
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          {employee.position} • {employee.department}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          ID: {employee.employee_id}
+                        </p>
+                      </div>
+                      <Badge
+                        variant={
+                          employee.status === "active" ? "default" : "secondary"
+                        }
+                      >
+                        {employee.status}
+                      </Badge>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </TabsContent>
+
+          {/* Rates Tab */}
+          <TabsContent value="rates" className="space-y-6">
+            <div className="flex justify-between items-center">
+              <h2 className="text-xl font-semibold text-foreground">
+                Employee Rates
+              </h2>
+              <Dialog open={showRateDialog} onOpenChange={setShowRateDialog}>
+                <DialogTrigger asChild>
+                  <Button>
+                    <DollarSign className="h-4 w-4 mr-2" />
+                    Set Rate
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Set Employee Rate</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4">
+                    <div>
+                      <Label htmlFor="rate-employee">Employee</Label>
+                      <Select
+                        value={rateForm.employee_id}
+                        onValueChange={(value) =>
+                          setRateForm({ ...rateForm, employee_id: value })
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select an employee" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {employees.map((employee) => (
+                            <SelectItem key={employee.id} value={employee.id}>
+                              {employee.name} ({employee.email})
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label htmlFor="rate-amount">Hourly Rate</Label>
+                        <Input
+                          id="rate-amount"
+                          type="number"
+                          step="0.01"
+                          value={rateForm.hourly_rate}
+                          onChange={(e) =>
+                            setRateForm({
+                              ...rateForm,
+                              hourly_rate: e.target.value,
+                            })
+                          }
+                          placeholder="0.00"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="rate-currency">Currency</Label>
+                        <Select
+                          value={rateForm.currency}
+                          onValueChange={(value) =>
+                            setRateForm({ ...rateForm, currency: value })
+                          }
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="INR">INR (₹)</SelectItem>
+                            <SelectItem value="USD">USD ($)</SelectItem>
+                            <SelectItem value="EUR">EUR (€)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    <Button onClick={setEmployeeRate} className="w-full">
+                      Set Rate
+                    </Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
+            </div>
+
+            <div className="grid gap-4">
+              {rates.map((rate) => {
+                const employee = employees.find(
+                  (e) => e.id === rate.employee_id
+                );
+                return (
+                  <Card key={rate.id}>
+                    <CardContent className="p-6">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h3 className="font-semibold text-foreground">
+                            {employee?.name || "Unknown Employee"}
+                          </h3>
+                          <p className="text-sm text-muted-foreground">
+                            {employee?.email}
+                          </p>
+                          <p className="text-sm text-muted-foreground">
+                            Effective from:{" "}
+                            {new Date(rate.effective_from).toLocaleDateString()}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-2xl font-bold text-foreground">
+                            {rate.currency === "INR"
+                              ? "₹"
+                              : rate.currency === "USD"
+                              ? "$"
+                              : "€"}
+                            {rate.hourly_rate}
+                          </p>
+                          <p className="text-sm text-muted-foreground">
+                            per hour
+                          </p>
+                        </div>
+                      </div>
                     </CardContent>
                   </Card>
-                </div>
-              )}
+                );
+              })}
             </div>
-          )}
-        </div>
+          </TabsContent>
 
-        {activeTab === "tasks" && (
-          <div>
-            <TaskManagement />
-          </div>
-        )}
-        {activeTab === "leaves" && (
-          <div>
-            <LeaveRequest />
-          </div>
-        )}
+          {/* Analytics Tab */}
+          <TabsContent value="analytics" className="space-y-6">
+            <AdminAnalytics />
+          </TabsContent>
+
+          {/* Advanced Tab */}
+          <TabsContent value="advanced" className="space-y-6">
+            <div className="grid gap-6">
+              <TimeLogs />
+              <ApprovalRules />
+              <ExportFunctionality />
+            </div>
+          </TabsContent>
+
+          {/* Admin Tools Tab */}
+          <TabsContent value="admin" className="space-y-6">
+            <div className="grid gap-6">
+              <EmployeeRoleManagement />
+              <BillableTagsSystem />
+              <HolidayLeaveCalendar />
+              <TimesheetBackupRestore />
+              <DuplicateBillingDetection />
+            </div>
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );

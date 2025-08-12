@@ -8,6 +8,7 @@ import {
   LogOut,
   Plus,
   Search,
+  Users,
   X,
 } from "lucide-react";
 import {
@@ -54,6 +55,23 @@ export default function EmployeeDashboard() {
   const [attachment, setAttachment] = useState();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const dispatch = useDispatch();
+  const [selectedEmployee, setSelectedEmployee] = useState("");
+  const employees = [
+    { id: "1", name: "John Doe", email: "john@example.com" },
+    { id: "2", name: "Jane Smith", email: "jane@example.com" },
+    { id: "3", name: "Alex Johnson", email: "alex@example.com" },
+    { id: "4", name: "Emily Davis", email: "emily@example.com" },
+  ];
+
+  const handleEmployeeChange = (value) => {
+    setSelectedEmployee(value);
+    const employee = employees.find((emp) => emp.id === value);
+    if (employee) {
+      console.log("Switched to:", employee.name, "-", employee.email);
+    }
+  };
+
+
   const handlePreviousWeek = () => {
     setCurrentWeekStart((prev) => addDays(prev, -7));
   };
@@ -101,6 +119,24 @@ export default function EmployeeDashboard() {
         <div className="flex items-center space-x-2">
           <div>
             <EmployeeNotification />
+          </div>
+          <div className="flex items-center gap-2">
+            <Users size={18} />
+            <Select
+              value={selectedEmployee}
+              onValueChange={handleEmployeeChange}
+            >
+              <SelectTrigger className="w-48">
+                <SelectValue placeholder="Switch Employee (Dev)" />
+              </SelectTrigger>
+              <SelectContent>
+                {employees.map((employee) => (
+                  <SelectItem key={employee.id} value={employee.id}>
+                    {employee.name} ({employee.email})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
