@@ -18,79 +18,97 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { Users, UserCog, Shield, Briefcase, DollarSign } from "lucide-react";
+import axiosInstance from "../services/axiosInstance"; // using your axios setup
 
 const EmployeeRoleManagement = () => {
-  const [employees, setEmployees] = useState([
-    {
-      id: "1",
-      name: "John Doe",
-      email: "john.doe@example.com",
-      department: "Administration",
-      role: "admin",
-      user_id: "user1",
-    },
-    {
-      id: "2",
-      name: "Jane Smith",
-      email: "jane.smith@example.com",
-      department: "Management",
-      role: "manager",
-      user_id: "user2",
-    },
-    {
-      id: "3",
-      name: "Mike Johnson",
-      email: "mike.johnson@example.com",
-      department: "Finance",
-      role: "finance",
-      user_id: "user3",
-    },
-    {
-      id: "4",
-      name: "Sarah Williams",
-      email: "sarah.williams@example.com",
-      department: "Development",
-      role: "employee",
-      user_id: "user4",
-    },
-  ]);
+  const [employees, setEmployees] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const { toast } = useToast();
 
   const roles = [
     {
-      value: "admin",
+      value: "Admin",
       label: "Admin",
       icon: Shield,
       color: "bg-red-100 text-red-800",
     },
     {
-      value: "manager",
+      value: "Manager",
       label: "Manager",
       icon: UserCog,
       color: "bg-blue-100 text-blue-800",
     },
     {
-      value: "finance",
+      value: "Finance",
       label: "Finance",
       icon: DollarSign,
       color: "bg-green-100 text-green-800",
     },
     {
-      value: "employee",
+      value: "Employee",
       label: "Employee",
       icon: Briefcase,
       color: "bg-gray-100 text-gray-800",
     },
   ];
 
+  // Fetch employees from backend
+  const fetchEmployees = async () => {
+    try {
+      setLoading(true);
+      const res = await axiosInstance.get("/api/v1/auth/users");
+      let data = res.data;
+
+      // Check if data is an object with a users property, otherwise use data directly
+      if (data && typeof data === "object" && Array.isArray(data.users)) {
+        data = data.users;
+      } else if (!Array.isArray(data)) {
+        console.error("Unexpected data format:", data);
+        data = []; // Fallback to empty array if data is not usable
+      }
+
+      // Map backend data to match the dummy data structure
+      const mapped = data
+        .filter((user) => !user.isDeleted)
+        .map((user) => {
+          const userRole = user.UserRoles?.find((role) => !role.isDeleted);
+          return {
+            id: user.id.toString(),
+            name: user.fullName,
+            email: user.email,
+            department: user.department || "N/A",
+            role: userRole?.role || "Employee",
+            user_id: `user${user.id}`,
+          };
+        });
+
+      setEmployees(mapped);
+    } catch (error) {
+      console.error("Error fetching employees:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load employees",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    setLoading(false);
+    fetchEmployees();
   }, []);
 
-  const updateEmployeeRole = (employeeId, userId, newRole) => {
+  // Update role in backend
+  const updateEmployeeRole = async (employeeId, userId, newRole) => {
     try {
+      console.log({ userId, newRole }); // Debug payload
+      await axiosInstance.post("/api/v1/auth/assign-role", {
+        userId: parseInt(userId.replace("user", "")),
+        role: newRole,
+      });
+
       setEmployees((prev) =>
         prev.map((emp) =>
           emp.id === employeeId ? { ...emp, role: newRole } : emp
@@ -103,9 +121,11 @@ const EmployeeRoleManagement = () => {
       });
     } catch (error) {
       console.error("Error updating role:", error);
+      console.log("Server response:", error.response?.data); // Debug server response
       toast({
         title: "Error",
-        description: "Failed to update employee role",
+        description:
+          error.response?.data?.message || "Failed to update employee role",
         variant: "destructive",
       });
     }
@@ -150,12 +170,14 @@ const EmployeeRoleManagement = () => {
               onChange={(e) => setSearchTerm(e.target.value)}
               className="max-w-sm"
             />
-            <Button variant="outline">Refresh</Button>
+            <Button variant="outline" onClick={fetchEmployees}>
+              Refresh
+            </Button>
           </div>
 
           <div className="grid gap-4">
             {filteredEmployees.map((employee) => {
-              const roleInfo = getRoleInfo(employee.role || "employee");
+              const roleInfo = getRoleInfo(employee.role || "Employee");
               const RoleIcon = roleInfo.icon;
 
               return (
@@ -185,7 +207,7 @@ const EmployeeRoleManagement = () => {
 
                     {employee.user_id && (
                       <Select
-                        value={employee.role || "employee"}
+                        value={employee.role || "Employee"}
                         onValueChange={(value) =>
                           updateEmployeeRole(
                             employee.id,
