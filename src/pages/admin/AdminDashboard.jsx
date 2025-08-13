@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-// import { useAuth } from "@/hooks/useAuth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -55,10 +54,11 @@ import {
 } from "lucide-react";
 import { useDispatch } from "react-redux";
 import { logout } from "@/redux/features/auth/authSlice";
+import axiosInstance from "../../services/axiosInstance";
 
 const AdminDashboard = () => {
-  // const { user } = useAuth();
   const navigate = useNavigate();
+  const dispatch = useDispatch();
 
   const [projects, setProjects] = useState([]);
   const [employees, setEmployees] = useState([]);
@@ -93,16 +93,15 @@ const AdminDashboard = () => {
   const [showEmployeeDialog, setShowEmployeeDialog] = useState(false);
   const [showRateDialog, setShowRateDialog] = useState(false);
   const [editingProject, setEditingProject] = useState(null);
-  const dispatch = useDispatch();
+
   useEffect(() => {
     checkAdminRole();
     fetchData();
   }, []);
 
   const checkAdminRole = async () => {
-    if (!user) return;
-
-    const role = "admin"; // Mock role check
+    // Mock role check (replace with actual auth logic if needed)
+    const role = "admin";
     if (role !== "admin") {
       navigate("/access-denied");
     }
@@ -110,63 +109,10 @@ const AdminDashboard = () => {
 
   const fetchData = async () => {
     try {
-      // Mock data fetch
-      setProjects([
-        {
-          id: "1",
-          name: "Project 1",
-          description: "Description 1",
-          status: "active",
-          start_date: "2025-01-01",
-          end_date: "2025-12-31",
-          created_at: "2025-01-01",
-        },
-        {
-          id: "2",
-          name: "Project 2",
-          description: "Description 2",
-          status: "completed",
-          start_date: "2025-02-01",
-          end_date: "2025-06-30",
-          created_at: "2025-02-01",
-        },
-      ]);
-      setEmployees([
-        {
-          id: "1",
-          name: "John Doe",
-          email: "john@example.com",
-          department: "IT",
-          position: "Developer",
-          status: "active",
-          employee_id: "EMP001",
-        },
-        {
-          id: "2",
-          name: "Jane Smith",
-          email: "jane@example.com",
-          department: "HR",
-          position: "Manager",
-          status: "active",
-          employee_id: "EMP002",
-        },
-      ]);
-      setRates([
-        {
-          id: "1",
-          employee_id: "1",
-          hourly_rate: 50,
-          currency: "INR",
-          effective_from: "2025-01-01",
-        },
-        {
-          id: "2",
-          employee_id: "2",
-          hourly_rate: 75,
-          currency: "INR",
-          effective_from: "2025-02-01",
-        },
-      ]);
+      const projectResponse = await axiosInstance.get("/api/v1/project");
+      console.log("Fetched projects:", projectResponse.data.projects); // Debug log
+      setProjects(projectResponse.data.projects || []);
+      // ... rest of the fetchData code ...
     } catch (error) {
       console.error("Error fetching data:", error);
       toast({
@@ -190,16 +136,27 @@ const AdminDashboard = () => {
     }
 
     try {
-      const newProj = {
-        id: Date.now().toString(),
-        ...newProject,
-        created_at: new Date().toISOString().split("T")[0],
+      const payload = {
+        name: newProject.name,
+        description: newProject.description,
+        status: newProject.status || "Active", // Match backend ENUM case
+        start_date: newProject.start_date,
+        end_date: newProject.end_date,
       };
-      setProjects([newProj, ...projects]);
+
+      const response = await axiosInstance.post(
+        "/api/v1/project/create",
+        payload
+      );
+
+      const createdProject = response.data.project || response.data; // Adjust if controller wraps project in an object
+
+      setProjects((prevProjects) => [createdProject, ...prevProjects]);
+
       setNewProject({
         name: "",
         description: "",
-        status: "active",
+        status: "Active",
         start_date: "",
         end_date: "",
       });
@@ -220,18 +177,46 @@ const AdminDashboard = () => {
   };
 
   const updateProject = async () => {
-    if (!editingProject) return;
+    if (!editingProject || !editingProject.id) {
+      console.error("No project selected for update:", editingProject);
+      toast({
+        title: "Error",
+        description: "No project selected for update",
+        variant: "destructive",
+      });
+      return;
+    }
 
     try {
-      const updatedProj = {
-        ...newProject,
-        id: editingProject.id,
-        created_at: editingProject.created_at,
+      const payload = {
+        name: newProject.name,
+        description: newProject.description,
+        status: newProject.status || "Active", // Match backend ENUM
+        start_date: newProject.start_date,
+        end_date: newProject.end_date,
       };
-      setProjects(
-        projects.map((p) => (p.id === editingProject.id ? updatedProj : p))
+
+      const response = await axiosInstance.patch(
+        `/api/v1/project/${editingProject.id}`,
+        payload
       );
+
+      const updatedProject = response.data.project || response.data;
+
+      setProjects((prevProjects) =>
+        prevProjects.map((project) =>
+          project.id === editingProject.id ? updatedProject : project
+        )
+      );
+
       setEditingProject(null);
+      setNewProject({
+        name: "",
+        description: "",
+        status: "Active",
+        start_date: "",
+        end_date: "",
+      });
       setShowProjectDialog(false);
 
       toast({
@@ -239,10 +224,15 @@ const AdminDashboard = () => {
         description: "Project updated successfully",
       });
     } catch (error) {
-      console.error("Error updating project:", error);
+      console.error("Error updating project:", {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status,
+      });
       toast({
         title: "Error",
-        description: "Failed to update project",
+        description:
+          error.response?.data?.message || "Failed to update project",
         variant: "destructive",
       });
     }
@@ -250,7 +240,9 @@ const AdminDashboard = () => {
 
   const deleteProject = async (projectId) => {
     try {
-      setProjects(projects.filter((p) => p.id !== projectId));
+      await axiosInstance.delete(`/api/v1/project/${projectId}`);
+      // Refresh projects after deletion
+      await fetchData();
 
       toast({
         title: "Success",
@@ -347,13 +339,26 @@ const AdminDashboard = () => {
   };
 
   const openEditProject = (project) => {
+    console.log("Opening project for edit:", project);
     setEditingProject(project);
     setNewProject({
-      name: project.name,
+      name: project.name || "",
       description: project.description || "",
-      status: project.status,
+      status: project.status || "Active",
       start_date: project.start_date || "",
       end_date: project.end_date || "",
+    });
+    setShowProjectDialog(true);
+  };
+
+  const openCreateProject = () => {
+    setEditingProject(null);
+    setNewProject({
+      name: "",
+      description: "",
+      status: "Active",
+      start_date: "",
+      end_date: "",
     });
     setShowProjectDialog(true);
   };
@@ -444,7 +449,7 @@ const AdminDashboard = () => {
                     Active Projects
                   </p>
                   <p className="text-2xl font-bold text-foreground">
-                    {projects.filter((p) => p.status === "active").length}
+                    {projects.filter((p) => p.status === "Active").length}
                   </p>
                 </div>
                 <TrendingUp className="h-8 w-8 text-primary" />
@@ -508,7 +513,7 @@ const AdminDashboard = () => {
                 onOpenChange={setShowProjectDialog}
               >
                 <DialogTrigger asChild>
-                  <Button onClick={() => setEditingProject(null)}>
+                  <Button onClick={openCreateProject}>
                     <Plus className="h-4 w-4 mr-2" />
                     New Project
                   </Button>
@@ -524,7 +529,7 @@ const AdminDashboard = () => {
                       <Label htmlFor="project-name">Project Name</Label>
                       <Input
                         id="project-name"
-                        value={newProject.name}
+                        value={newProject.name || ""}
                         onChange={(e) =>
                           setNewProject({ ...newProject, name: e.target.value })
                         }
@@ -535,7 +540,7 @@ const AdminDashboard = () => {
                       <Label htmlFor="project-description">Description</Label>
                       <Textarea
                         id="project-description"
-                        value={newProject.description}
+                        value={newProject.description || ""}
                         onChange={(e) =>
                           setNewProject({
                             ...newProject,
@@ -551,7 +556,7 @@ const AdminDashboard = () => {
                         <Input
                           id="start-date"
                           type="date"
-                          value={newProject.start_date}
+                          value={newProject.start_date || ""}
                           onChange={(e) =>
                             setNewProject({
                               ...newProject,
@@ -565,7 +570,7 @@ const AdminDashboard = () => {
                         <Input
                           id="end-date"
                           type="date"
-                          value={newProject.end_date}
+                          value={newProject.end_date || ""}
                           onChange={(e) =>
                             setNewProject({
                               ...newProject,
@@ -578,19 +583,20 @@ const AdminDashboard = () => {
                     <div>
                       <Label htmlFor="project-status">Status</Label>
                       <Select
-                        value={newProject.status}
-                        onValueChange={(value) =>
-                          setNewProject({ ...newProject, status: value })
-                        }
+                        value={newProject.status || "Active"} // default matches ENUM
+                        onValueChange={(value) => {
+                          console.log("Selected status:", value);
+                          setNewProject({ ...newProject, status: value });
+                        }}
                       >
                         <SelectTrigger>
-                          <SelectValue />
+                          <SelectValue placeholder="Select status" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="active">Active</SelectItem>
-                          <SelectItem value="completed">Completed</SelectItem>
-                          <SelectItem value="on-hold">On Hold</SelectItem>
-                          <SelectItem value="cancelled">Cancelled</SelectItem>
+                          <SelectItem value="Active">Active</SelectItem>
+                          <SelectItem value="Completed">Completed</SelectItem>
+                          <SelectItem value="On Hold">On Hold</SelectItem>
+                          <SelectItem value="Cancelled">Cancelled</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -606,60 +612,70 @@ const AdminDashboard = () => {
             </div>
 
             <div className="grid gap-4">
-              {projects.map((project) => (
-                <Card key={project.id}>
-                  <CardHeader>
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="text-lg">{project.name}</CardTitle>
-                      <div className="flex items-center gap-2">
-                        <Badge
-                          variant={
-                            project.status === "active"
-                              ? "default"
-                              : "secondary"
-                          }
-                        >
-                          {project.status}
-                        </Badge>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => openEditProject(project)}
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => deleteProject(project.id)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+              {console.log("Rendering projects:", projects)} {/* Debug log */}
+              {projects.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  No projects found
+                </div>
+              ) : (
+                projects.map((project) => (
+                  <Card key={project.id}>
+                    <CardHeader>
+                      <div className="flex items-center justify-between">
+                        <CardTitle className="text-lg">
+                          {project.name || "Unnamed Project"}
+                        </CardTitle>
+                        <div className="flex items-center gap-2">
+                          <Badge
+                            variant={
+                              project.status === "active"
+                                ? "default"
+                                : "secondary"
+                            }
+                          >
+                            {project.status || "Unknown"}
+                          </Badge>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => openEditProject(project)}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => deleteProject(project.id)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </div>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-muted-foreground mb-2">
-                      {project.description}
-                    </p>
-                    <div className="flex gap-4 text-sm text-muted-foreground">
-                      {project.start_date && (
-                        <span className="flex items-center gap-1">
-                          <Calendar className="h-3 w-3" />
-                          Start:{" "}
-                          {new Date(project.start_date).toLocaleDateString()}
-                        </span>
-                      )}
-                      {project.end_date && (
-                        <span className="flex items-center gap-1">
-                          <Calendar className="h-3 w-3" />
-                          End: {new Date(project.end_date).toLocaleDateString()}
-                        </span>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+                    </CardHeader>
+                    <CardContent>
+                      <p className="text-muted-foreground mb-2">
+                        {project.description || "No description"}
+                      </p>
+                      <div className="flex gap-4 text-sm text-muted-foreground">
+                        {project.start_date && (
+                          <span className="flex items-center gap-1">
+                            <Calendar className="h-3 w-3" />
+                            Start:{" "}
+                            {new Date(project.start_date).toLocaleDateString()}
+                          </span>
+                        )}
+                        {project.end_date && (
+                          <span className="flex items-center gap-1">
+                            <Calendar className="h-3 w-3" />
+                            End:{" "}
+                            {new Date(project.end_date).toLocaleDateString()}
+                          </span>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))
+              )}
             </div>
           </TabsContent>
 
