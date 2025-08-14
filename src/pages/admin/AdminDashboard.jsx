@@ -55,6 +55,9 @@ import {
 import { useDispatch } from "react-redux";
 import { logout } from "@/redux/features/auth/authSlice";
 import axiosInstance from "../../services/axiosInstance";
+import DashboardOverview from "../../components/DashboardOverview";
+import TimeTrackingReport from "../../components/TimeTrackingReport";
+import TimeTrackingDashboard from "../../components/TimeTrackingDashboard";
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
@@ -407,77 +410,12 @@ const AdminDashboard = () => {
       </div>
 
       <div className="mx-auto px-4 py-6">
-        {/* Overview Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">
-                    Total Projects
-                  </p>
-                  <p className="text-2xl font-bold text-foreground">
-                    {projects.length}
-                  </p>
-                </div>
-                <FolderPlus className="h-8 w-8 text-primary" />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">
-                    Total Employees
-                  </p>
-                  <p className="text-2xl font-bold text-foreground">
-                    {employees.length}
-                  </p>
-                </div>
-                <Users className="h-8 w-8 text-primary" />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">
-                    Active Projects
-                  </p>
-                  <p className="text-2xl font-bold text-foreground">
-                    {projects.filter((p) => p.status === "Active").length}
-                  </p>
-                </div>
-                <TrendingUp className="h-8 w-8 text-primary" />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">
-                    Rate Configs
-                  </p>
-                  <p className="text-2xl font-bold text-foreground">
-                    {rates.length}
-                  </p>
-                </div>
-                <DollarSign className="h-8 w-8 text-primary" />
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
         {/* Main Content */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-8 md:grid-cols-4 lg:grid-cols-8">
+          <TabsList className="grid w-full grid-cols-8 md:grid-cols-5 lg:grid-cols-10">
             <TabsTrigger value="overview">Overview</TabsTrigger>
+            <TabsTrigger value="tracking">Tracking</TabsTrigger>
+            <TabsTrigger value="reports">Reports</TabsTrigger>
             <TabsTrigger value="timesheets">Timesheets</TabsTrigger>
             <TabsTrigger value="projects">Projects</TabsTrigger>
             <TabsTrigger value="assignments">Assignments</TabsTrigger>
@@ -489,12 +427,16 @@ const AdminDashboard = () => {
 
           {/* Overview Tab */}
           <TabsContent value="overview" className="space-y-6">
-            <div className="text-center py-8">
-              <h2 className="text-xl font-semibold mb-4">Admin Overview</h2>
-              <p className="text-muted-foreground">
-                Use the tabs above to manage different aspects of the system.
-              </p>
-            </div>
+            <DashboardOverview />
+          </TabsContent>
+
+          <TabsContent value="tracking" className="space-y-6">
+            <TimeTrackingDashboard />
+          </TabsContent>
+
+          {/* Time Tracking Report Tab */}
+          <TabsContent value="reports" className="space-y-6">
+            <TimeTrackingReport />
           </TabsContent>
 
           {/* Timesheets Tab */}
