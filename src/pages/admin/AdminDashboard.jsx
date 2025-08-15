@@ -1203,7 +1203,7 @@ const AdminDashboard = () => {
                           </p>
                           <p className="text-sm text-muted-foreground">
                             Effective from:{" "}
-                            {new Date(rate.effective_from).toLocaleDateString()}
+                            {new Date(rate.effective_from)}
                           </p>
                         </div>
                         <div className="text-right">
