@@ -59,6 +59,7 @@ const EmployeeRoleManagement = () => {
       setLoading(true);
       const res = await axiosInstance.get("/api/v1/auth/users");
       let data = res.data;
+      console.log(res.data);
 
       // Check if data is an object with a users property, otherwise use data directly
       if (data && typeof data === "object" && Array.isArray(data.users)) {
@@ -73,15 +74,17 @@ const EmployeeRoleManagement = () => {
         .filter((user) => !user.isDeleted)
         .map((user) => {
           const userRole = user.UserRoles?.find((role) => !role.isDeleted);
+          console.log(userRole);
           return {
             id: user.id.toString(),
             name: user.fullName,
             email: user.email,
             department: user.department || "N/A",
-            role: userRole?.role || "Employee",
+            role: userRole?.role,
             user_id: `user${user.id}`,
           };
         });
+      // console.log("User roles:", user.userRole);
 
       setEmployees(mapped);
     } catch (error) {

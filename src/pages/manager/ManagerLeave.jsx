@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { differenceInDays } from "date-fns";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -26,17 +27,75 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import { toast } from "sonner";
+import axiosInstance from "../../services/axiosInstance"; // Adjust the import path based on your project structure
 
 const ManagerLeave = () => {
   const [filter, setFilter] = useState("pending");
+  const [leaveRequests, setLeaveRequests] = useState([]);
 
-  // No dummy data — empty array for now
-  const leaveRequests = [];
+  // Fetch leave requests on component mount
+  useEffect(() => {
+    const fetchLeaveRequests = async () => {
+      try {
+        const response = await axiosInstance.get("/api/v1/leave", {
+          params: { page: 1, limit: 100 }, // Adjust limit as needed
+        });
+        console.log("Leave requests response:", response.data); // Debug response
+        // Ensure response.data.leaves is an array
+        const leaves = Array.isArray(response.data.leaves)
+          ? response.data.leaves
+          : [];
+        const mappedRequests = leaves.map((leave) => ({
+          id: leave.id,
+          name: leave.employeeName,
+          email: leave.employeeEmail, // Placeholder; update if Employee join is implemented
+          dept: leave.employeeDepartment, // Placeholder; update if Employee join is implemented
+          type: leave.leaveType,
+          days:
+            differenceInDays(new Date(leave.toDate), new Date(leave.fromDate)) +
+            1,
+          status: leave.status.toLowerCase(),
+        }));
+        setLeaveRequests(mappedRequests);
+      } catch (error) {
+        toast.error("Failed to fetch leave requests. Please try again.");
+        console.error("Error fetching leave requests:", error);
+      }
+    };
+    fetchLeaveRequests();
+  }, []);
 
   const filteredRequests =
     filter === "all"
       ? leaveRequests
       : leaveRequests.filter((req) => req.status === filter);
+
+  const approveLeave = async (id) => {
+    try {
+      await axiosInstance.patch(`/api/v1/leave/${id}`, { status: "Approved" });
+      setLeaveRequests((prev) =>
+        prev.map((req) =>
+          req.id === id ? { ...req, status: "approved" } : req
+        )
+      );
+      toast.success("Leave request approved successfully.");
+    } catch (error) {
+      toast.error("Failed to approve leave request. Please try again.");
+      console.error("Error approving leave request:", error);
+    }
+  };
+
+  const rejectLeave = async (id) => {
+    try {
+      await axiosInstance.delete(`/api/v1/leave/${id}`);
+      setLeaveRequests((prev) => prev.filter((req) => req.id !== id));
+      toast.success("Leave request rejected and removed successfully.");
+    } catch (error) {
+      toast.error("Failed to reject leave request. Please try again.");
+      console.error("Error rejecting leave request:", error);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -134,7 +193,7 @@ const ManagerLeave = () => {
               <CardContent>
                 <div className="space-y-4">
                   <div className="flex gap-2 pt-4">
-                    <Button>
+                    <Button onClick={() => approveLeave(req.id)}>
                       <CheckCircle className="h-4 w-4 mr-2" />
                       Approve
                     </Button>
@@ -149,8 +208,8 @@ const ManagerLeave = () => {
                         <DialogHeader>
                           <DialogTitle>Reject Leave Request</DialogTitle>
                           <DialogDescription>
-                            Please provide feedback for {req.name} about why
-                            this leave request is being rejected.
+                            Confirm rejection of {req.name}'s leave request.
+                            This action will remove the request.
                           </DialogDescription>
                         </DialogHeader>
                         <div className="space-y-4">
@@ -162,7 +221,10 @@ const ManagerLeave = () => {
                             />
                           </div>
                           <div className="flex gap-2">
-                            <Button variant="destructive">
+                            <Button
+                              variant="destructive"
+                              onClick={() => rejectLeave(req.id)}
+                            >
                               <MessageSquare className="h-4 w-4 mr-2" />
                               Send Rejection
                             </Button>

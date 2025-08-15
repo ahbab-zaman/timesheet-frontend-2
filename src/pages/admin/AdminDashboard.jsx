@@ -536,7 +536,7 @@ const AdminDashboard = () => {
         </div>
       </div>
 
-      <div className="mx-auto px-4 py-6 max-w-[1200px]">
+      <div className="mx-auto px-4 py-6">
         {/* Main Content */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="grid w-full grid-cols-8 md:grid-cols-5 lg:grid-cols-10">
