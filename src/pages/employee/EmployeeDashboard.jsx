@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { format, addDays, startOfWeek } from "date-fns";
 import {
   CalendarIcon,
@@ -6,9 +6,7 @@ import {
   ChevronRight,
   Filter,
   LogOut,
-  Plus,
   Search,
-  Users,
   X,
 } from "lucide-react";
 import {
@@ -42,6 +40,7 @@ import TimeTracker from "./TimeTracker";
 import EmployeeNotification from "./EmployeeNotification";
 import { useDispatch } from "react-redux";
 import { logout } from "@/redux/features/auth/authSlice";
+import axiosInstance from "../../services/axiosInstance"; // Adjust the import path based on your project structure
 
 export default function EmployeeDashboard() {
   const [currentWeekStart, setCurrentWeekStart] = useState(
@@ -54,23 +53,27 @@ export default function EmployeeDashboard() {
   const [reason, setReason] = useState("");
   const [attachment, setAttachment] = useState();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [currentEmployee, setCurrentEmployee] = useState(null);
   const dispatch = useDispatch();
-  const [selectedEmployee, setSelectedEmployee] = useState("");
-  const employees = [
-    { id: "1", name: "John Doe", email: "john@example.com" },
-    { id: "2", name: "Jane Smith", email: "jane@example.com" },
-    { id: "3", name: "Alex Johnson", email: "alex@example.com" },
-    { id: "4", name: "Emily Davis", email: "emily@example.com" },
-  ];
 
-  const handleEmployeeChange = (value) => {
-    setSelectedEmployee(value);
-    const employee = employees.find((emp) => emp.id === value);
-    if (employee) {
-      console.log("Switched to:", employee.name, "-", employee.email);
-    }
-  };
-
+  // Fetch logged-in employee details on component mount
+  useEffect(() => {
+    const fetchCurrentEmployee = async () => {
+      try {
+        const response = await axiosInstance.get("/api/v1/employee", {
+          params: { page: 1, limit: 1 }, // Fetch only one employee (assuming logged-in user)
+        });
+        // Assuming the logged-in employee is the first in the list
+        const employee = response.data.employees[0];
+        setCurrentEmployee(employee);
+        console.log("Fetched employee data:", employee);
+      } catch (error) {
+        toast.error("Failed to fetch employee details. Please try again.");
+        console.error("Error fetching current employee:", error);
+      }
+    };
+    fetchCurrentEmployee();
+  }, []);
 
   const handlePreviousWeek = () => {
     setCurrentWeekStart((prev) => addDays(prev, -7));
@@ -86,21 +89,77 @@ export default function EmployeeDashboard() {
     }
   };
 
-  const handleLeaveSubmit = () => {
+  const handleLeaveSubmit = async () => {
+    // Validate form inputs
+    if (!currentEmployee) {
+      toast.error("Employee details not loaded. Please try again.");
+      return;
+    }
+    if (!leaveType) {
+      toast.error("Please select a leave type.");
+      return;
+    }
+    if (!fromDate) {
+      toast.error("Please select a start date.");
+      return;
+    }
+    if (!toDate) {
+      toast.error("Please select an end date.");
+      return;
+    }
+    if (!reason.trim()) {
+      toast.error("Please provide a reason for the leave.");
+      return;
+    }
+    if (new Date(toDate) < new Date(fromDate)) {
+      toast.error("End date cannot be before start date.");
+      return;
+    }
+
     setIsSubmitting(true);
 
-    // Simulate async action like API call
-    setTimeout(() => {
+    try {
+      // Prepare leave request data
+      const leaveData = {
+        employeeName: currentEmployee.name,
+        employeeEmail : currentEmployee.email,
+        employeeDepartment : currentEmployee.department,
+        leaveType,
+        fromDate,
+        toDate,
+        reason,
+        attachment: attachment || null,
+        createdBy: parseInt(currentEmployee.user_id, 10), // Convert to integer
+      };
+
+      console.log("Submitting leave request:", leaveData);
+
+      // Make API call to create leave
+      await axiosInstance.post("/api/v1/leave/create", leaveData);
+
       toast.success("📝 Your request has been sent to manager for approval");
 
+      // Reset form and close dialog
       setLeaveDialogOpen(false);
       setLeaveType("");
       setFromDate(undefined);
       setToDate(undefined);
       setReason("");
       setAttachment(undefined);
+    } catch (error) {
+      // Handle specific backend validation errors
+      if (error.response?.status === 400 && error.response?.data?.errors) {
+        const errorMessages = error.response.data.errors
+          .map((err) => err.message)
+          .join(", ");
+        toast.error(`Failed to submit leave request: ${errorMessages}`);
+      } else {
+        toast.error("Failed to submit leave request. Please try again.");
+      }
+      console.error("Error submitting leave request:", error);
+    } finally {
       setIsSubmitting(false);
-    }, 1500); // simulate 1.5s delay
+    }
   };
 
   const weekDates = Array.from({ length: 7 }, (_, i) =>
@@ -119,24 +178,6 @@ export default function EmployeeDashboard() {
         <div className="flex items-center space-x-2">
           <div>
             <EmployeeNotification />
-          </div>
-          <div className="flex items-center gap-2">
-            <Users size={18} />
-            <Select
-              value={selectedEmployee}
-              onValueChange={handleEmployeeChange}
-            >
-              <SelectTrigger className="w-48">
-                <SelectValue placeholder="Switch Employee (Dev)" />
-              </SelectTrigger>
-              <SelectContent>
-                {employees.map((employee) => (
-                  <SelectItem key={employee.id} value={employee.id}>
-                    {employee.name} ({employee.email})
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
           </div>
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
@@ -173,9 +214,16 @@ export default function EmployeeDashboard() {
                       <SelectValue placeholder="Select leave type" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="sick">Sick Leave</SelectItem>
-                      <SelectItem value="casual">Casual Leave</SelectItem>
-                      <SelectItem value="earned">Earned Leave</SelectItem>
+                      <SelectItem value="Casual Leave">Casual Leave</SelectItem>
+                      <SelectItem value="Sick Leave">Sick Leave</SelectItem>
+                      <SelectItem value="Earned Leave">Earned Leave</SelectItem>
+                      <SelectItem value="Maternity Leave">
+                        Maternity Leave
+                      </SelectItem>
+                      <SelectItem value="Paternity Leave">
+                        Paternity Leave
+                      </SelectItem>
+                      <SelectItem value="Other">Other</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -213,11 +261,12 @@ export default function EmployeeDashboard() {
                 </div>
                 <div>
                   <label className="block text-sm font-medium mb-1">
-                    Attachment (Optional)
+                    Photo (Optional)
                   </label>
                   <Input
-                    type="file"
-                    onChange={(e) => setAttachment(e.target.files?.[0])}
+                    type="url"
+                    value={attachment || ""}
+                    onChange={(e) => setAttachment(e.target.value)}
                   />
                   <p className="text-xs text-muted-foreground mt-1">
                     Upload medical certificate or supporting documents
