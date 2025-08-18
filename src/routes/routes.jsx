@@ -5,11 +5,14 @@ import AdminDashboard from "@/pages/admin/AdminDashboard";
 import EmployeeManagement from "@/pages/admin/EmployeeManagement";
 import ManagerDashboard from "@/pages/manager/ManagerDashboard";
 import EmployeeDashboard from "@/pages/employee/EmployeeDashboard";
-import ProtectedRoute from "@/components/layout/ProtectedRoute";
-import RedirectToDashboard from "@/utils/RedirectToDashboard";
 import FinanceDashboard from "@/pages/finance/FinanceDashboard";
 
+import ProtectedRoute from "@/components/layout/ProtectedRoute";
+import PublicRoute from "../utils/RedirectToDashboard"; // rename RedirectToDashboard → PublicRoute
+import RedirectToDashboard from "../utils/RedirectToDashboard";
+
 const router = createBrowserRouter([
+  // Root → redirect based on role if logged in
   {
     path: "/",
     element: (
@@ -18,53 +21,65 @@ const router = createBrowserRouter([
       </ProtectedRoute>
     ),
   },
+
+  // Admin Routes
   {
     path: "/admin",
-    element: <App />,
+    element: (
+      <ProtectedRoute>
+        <App />
+      </ProtectedRoute>
+    ),
     children: [
-      {
-        path: "dashboard",
-        element: <AdminDashboard />,
-      },
+      { path: "dashboard", element: <AdminDashboard /> },
       {
         path: "dashboard/employee-management",
         element: <EmployeeManagement />,
       },
     ],
   },
+
+  // Manager Routes
   {
     path: "/manager",
-    element: <App />,
-    children: [
-      {
-        path: "dashboard",
-        element: <ManagerDashboard />,
-      },
-    ],
+    element: (
+      <ProtectedRoute>
+        <App />
+      </ProtectedRoute>
+    ),
+    children: [{ path: "dashboard", element: <ManagerDashboard /> }],
   },
+
+  // Employee Routes
   {
     path: "/employee",
-    element: <App />,
-    children: [
-      {
-        path: "dashboard",
-        element: <EmployeeDashboard />,
-      },
-    ],
+    element: (
+      <ProtectedRoute>
+        <App />
+      </ProtectedRoute>
+    ),
+    children: [{ path: "dashboard", element: <EmployeeDashboard /> }],
   },
+
+  // Finance Routes
   {
     path: "/finance",
-    element: <App />,
-    children: [
-      {
-        path: "dashboard",
-        element: <FinanceDashboard />,
-      },
-    ],
+    element: (
+      <ProtectedRoute>
+        <App />
+      </ProtectedRoute>
+    ),
+    children: [{ path: "dashboard", element: <FinanceDashboard /> }],
   },
+
+  // Login → Public only
   {
     path: "/login",
-    element: <Login />,
+    element: (
+      <PublicRoute>
+        <Login />
+      </PublicRoute>
+    ),
   },
 ]);
 
