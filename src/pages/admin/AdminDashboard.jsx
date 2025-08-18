@@ -77,6 +77,10 @@ const AdminDashboard = () => {
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [employeeToDelete, setEmployeeToDelete] = useState(null);
   const [editingEmployeeId, setEditingEmployeeId] = useState(null);
+  const [showProjectDialog, setShowProjectDialog] = useState(false);
+  const [editingProject, setEditingProject] = useState(null);
+
+  const [showRateDialog, setShowRateDialog] = useState(false);
 
   // Form states
   const [newProject, setNewProject] = useState({
@@ -101,10 +105,15 @@ const AdminDashboard = () => {
     currency: "INR",
   });
 
-  const [activeTab, setActiveTab] = useState("overview");
-  const [showProjectDialog, setShowProjectDialog] = useState(false);
-  const [showRateDialog, setShowRateDialog] = useState(false);
-  const [editingProject, setEditingProject] = useState(null);
+  // Initialize activeTab from localStorage, default to "overview" if not found
+  const [activeTab, setActiveTab] = useState(() => {
+    return localStorage.getItem("activeTab") || "overview";
+  });
+
+  // Save activeTab to localStorage whenever it changes
+  useEffect(() => {
+    localStorage.setItem("activeTab", activeTab);
+  }, [activeTab]);
 
   useEffect(() => {
     checkAdminRole();
@@ -179,7 +188,7 @@ const AdminDashboard = () => {
       });
       setShowProjectDialog(false);
 
-      toast.success({
+      toast({
         title: "Success",
         description: "Project created successfully",
       });
@@ -235,13 +244,13 @@ const AdminDashboard = () => {
       });
       setShowProjectDialog(false);
 
-      toast.success({
+      toast({
         title: "Success",
         description: "Project updated successfully",
       });
     } catch (error) {
       console.error("Error updating project:", error);
-      toast.error({
+      toast({
         title: "Error",
         description:
           error.response?.data?.message || "Failed to update project",
@@ -305,13 +314,13 @@ const AdminDashboard = () => {
       resetEmployeeForm();
       setOpenEmployeeDialog(false);
 
-      toast.success({
+      toast({
         title: "Success",
         description: "Employee added successfully",
       });
     } catch (error) {
       console.error("Error creating employee:", error);
-      toast.error({
+      toast({
         title: "Error",
         description:
           error.response?.data?.message || "Failed to create employee",
@@ -357,7 +366,7 @@ const AdminDashboard = () => {
       resetEmployeeForm();
       setEditEmployeeDialog(false);
 
-      toast.success({
+      toast({
         title: "Success",
         description: "Employee updated successfully",
       });
@@ -366,7 +375,7 @@ const AdminDashboard = () => {
       console.log("Updated employee:", updatedEmployee);
     } catch (error) {
       console.error("Error updating employee:", error);
-      toast.error({
+      toast({
         title: "Error",
         description:
           error.response?.data?.message || "Failed to update employee",
@@ -382,13 +391,13 @@ const AdminDashboard = () => {
       await axiosInstance.delete(`/api/v1/employee/${employeeToDelete}`);
       setEmployees((prev) => prev.filter((emp) => emp.id !== employeeToDelete));
 
-      toast.success({
+      toast({
         title: "Success",
         description: "Employee deleted successfully",
       });
     } catch (error) {
       console.error("Error deleting employee:", error);
-      toast.error({
+      toast({
         title: "Error",
         description:
           error.response?.data?.message || "Failed to delete employee",
@@ -1202,8 +1211,7 @@ const AdminDashboard = () => {
                             {employee?.email}
                           </p>
                           <p className="text-sm text-muted-foreground">
-                            Effective from:{" "}
-                            {new Date(rate.effective_from)}
+                            Effective from: {new Date(rate.effective_from)}
                           </p>
                         </div>
                         <div className="text-right">

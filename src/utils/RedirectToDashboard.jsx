@@ -1,16 +1,15 @@
-// components/RedirectToDashboard.js
-import { useSelector } from 'react-redux';
-import { Navigate } from 'react-router-dom';
-import { useCurrentUser } from '@/redux/features/auth/authSlice';
+import { useSelector } from "react-redux";
+import { Navigate } from "react-router-dom";
+import { useCurrentUser } from "@/redux/features/auth/authSlice";
 
-const RedirectToDashboard = () => {
+const RedirectToDashboard = ({ children }) => {
   const user = useSelector(useCurrentUser);
 
-  if (!user || !user.role) {
-    return <Navigate to="/login" replace />;
+  if (user && user.role) {
+    return <Navigate to={`/${user.role.toLowerCase()}/dashboard`} replace />;
   }
 
-  return <Navigate to={`/${user.role.toLowerCase()}/dashboard`} replace />;
+  return children;
 };
 
 export default RedirectToDashboard;
