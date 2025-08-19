@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Card,
   CardContent,
@@ -45,6 +45,7 @@ import { NavLink } from "react-router-dom";
 import { useDispatch } from "react-redux";
 import { logout } from "@/redux/features/auth/authSlice";
 import { toast } from "sonner";
+import axiosInstance from "@/services/axiosInstance"; // Import axios instance
 
 const FinanceDashboard = () => {
   const [activeTab, setActiveTab] = useState("overview");
@@ -65,6 +66,9 @@ const FinanceDashboard = () => {
     account_holder_name: "",
     upi_id: "",
   });
+  const [filteredSummary, setFilteredSummary] = useState([]); // State to hold imported data
+  const [loading, setLoading] = useState(false); // State for data fetching
+  const [importing, setImporting] = useState(false); // State for CSV import
   const dispatch = useDispatch();
 
   const tabs = [
@@ -78,7 +82,7 @@ const FinanceDashboard = () => {
     "Invoices",
   ];
 
-  // Dummy data for employees
+  // Dummy data for employees (unchanged)
   const employees = [
     {
       id: "1",
@@ -100,44 +104,7 @@ const FinanceDashboard = () => {
     },
   ];
 
-  // Dummy data for filteredSummary
-  const filteredSummary = [
-    {
-      employee_id: "1",
-      name: "John Doe",
-      employee_number: "EMP001",
-      email: "john.doe@example.com",
-      project_name: "Project Alpha",
-      approved_hours: 160,
-      hourly_rate: 500,
-      payment_amount: 80000,
-      status: "Unpaid",
-    },
-    {
-      employee_id: "2",
-      name: "Jane Smith",
-      employee_number: "EMP002",
-      email: "jane.smith@example.com",
-      project_name: "Project Beta",
-      approved_hours: 140,
-      hourly_rate: 600,
-      payment_amount: 84000,
-      status: "Paid",
-    },
-    {
-      employee_id: "3",
-      name: "Alice Johnson",
-      employee_number: "EMP003",
-      email: "alice.johnson@example.com",
-      project_name: "Project Gamma",
-      approved_hours: 120,
-      hourly_rate: 550,
-      payment_amount: 66000,
-      status: "Unpaid",
-    },
-  ];
-
-  // Dummy data for bonuses
+  // Dummy data for bonuses, paymentFailures, disputes, bankDetails, blockedEmployees (unchanged)
   const bonuses = [
     {
       id: "1",
@@ -155,7 +122,6 @@ const FinanceDashboard = () => {
     },
   ];
 
-  // Dummy data for payment failures
   const paymentFailures = [
     {
       id: "1",
@@ -175,7 +141,6 @@ const FinanceDashboard = () => {
     },
   ];
 
-  // Dummy data for disputes
   const disputes = [
     {
       id: "1",
@@ -197,7 +162,6 @@ const FinanceDashboard = () => {
     },
   ];
 
-  // Dummy data for bank details
   const bankDetails = [
     {
       id: "1",
@@ -217,7 +181,6 @@ const FinanceDashboard = () => {
     },
   ];
 
-  // Dummy data for blocked employees
   const blockedEmployees = [
     {
       id: "3",
@@ -229,7 +192,54 @@ const FinanceDashboard = () => {
     },
   ];
 
-  // Helper functions
+  // Fetch data from backend on mount
+  useEffect(() => {
+    fetchSummaries();
+  }, []);
+
+  // API call to fetch summaries
+  const fetchSummaries = async () => {
+    setLoading(true); // Start loading
+    try {
+      const response = await axiosInstance.get("api/v1/summary/data");
+      console.log(response.data);
+      setFilteredSummary(response.data);
+    } catch (error) {
+      console.error("Error fetching summaries:", error);
+      toast.error("Failed to load summaries");
+    } finally {
+      setLoading(false); // Stop loading
+    }
+  };
+
+  // Handle CSV file import
+  const handleImport = async (event) => {
+    const file = event.target.files[0];
+    if (!file) {
+      toast.error("Please select a CSV file");
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append("csvFile", file);
+    setImporting(true); // Start importing
+    try {
+      await axiosInstance.post("api/v1/summary/import", formData, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      });
+      toast.success("Data imported successfully");
+      fetchSummaries(); // Refresh data after import
+    } catch (error) {
+      console.error("Error importing data:", error);
+      toast.error("Failed to import data");
+    } finally {
+      setImporting(false); // Stop importing
+    }
+  };
+
+  // Helper functions (unchanged)
   const selectAllUnpaid = () => {
     const unpaidIds = filteredSummary
       .filter((s) => s.status === "Unpaid")
@@ -248,8 +258,19 @@ const FinanceDashboard = () => {
   };
 
   const handleUpdateRate = (employeeId, rate) => {
-    console.log(`Updating rate for employee ${employeeId} to ₹${rate}/hr`);
-    setEditingRate(null);
+    setFilteredSummary((prevSummary) =>
+      prevSummary.map((summary) =>
+        summary.employee_id === employeeId
+          ? {
+              ...summary,
+              rate: rate, // Update the rate
+              payment_amount: summary.hours * rate, // Recalculate payment_amount
+            }
+          : summary
+      )
+    );
+    setEditingRate(null); // Exit editing mode
+    toast.success(`Rate updated to ₹${rate}/hr for employee ${employeeId}`);
   };
 
   const generateInvoice = (summary) => {
@@ -264,13 +285,11 @@ const FinanceDashboard = () => {
     console.log("Adding bank details:", bankForm);
   };
 
-  // Dummy month options
   const generateMonthOptions = () => [
     { value: "2025-08-01", label: "August 2025" },
     { value: "2025-07-01", label: "July 2025" },
   ];
 
-  // Dummy format function
   const format = (date, formatString) => {
     return new Date(date).toLocaleDateString("en-US", {
       month: formatString.includes("MMM") ? "short" : "long",
@@ -287,12 +306,6 @@ const FinanceDashboard = () => {
   return (
     <div className="p-6 space-y-6">
       <div className="flex items-center gap-2">
-        {/* <NavLink to="/finance/dashboard">
-        <Button variant="ghost" className="text-sm cursor-pointer">
-          <ArrowLeft />
-          Back to Home
-        </Button>
-        </NavLink> */}
         <div className="flex justify-between items-center w-full">
           <div>
             <h1 className="text-2xl font-bold">AIREPRO Finance Dashboard</h1>
@@ -308,7 +321,7 @@ const FinanceDashboard = () => {
           </div>
         </div>
       </div>
-      {/* Filters */}
+      {/* Filters and Import */}
       <div className="grid grid-cols-1 sm:grid-cols-5 gap-4">
         <Select>
           <SelectTrigger>
@@ -344,31 +357,95 @@ const FinanceDashboard = () => {
 
         <Input placeholder="Search employees..." />
 
-        <Button className="flex items-center gap-2">
-          <DownloadIcon className="w-4 h-4" /> Export
-        </Button>
+        <div className="flex items-center justify-center gap-2">
+          <Button className="flex items-center gap-2">
+            <DownloadIcon className="w-4 h-4" /> Export
+          </Button>
+          <label htmlFor="import-file" className="cursor-pointer">
+            <Button variant="secondary" asChild disabled={importing}>
+              <span>
+                {importing ? (
+                  <span className="flex items-center gap-2">
+                    <svg
+                      className="animate-spin h-4 w-4"
+                      xmlns="http://www.w3.org/2000/svg"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                    >
+                      <circle
+                        className="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                      ></circle>
+                      <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                      ></path>
+                    </svg>
+                    Importing...
+                  </span>
+                ) : (
+                  "Import"
+                )}
+              </span>
+            </Button>
+          </label>
+          <input
+            id="import-file"
+            type="file"
+            accept=".csv"
+            onChange={handleImport}
+            className="hidden"
+            disabled={importing}
+          />
+        </div>
       </div>
       {/* Actions */}
       <div className="flex gap-4">
-        <Button variant="outline">Select All Unpaid</Button>
-        <Button variant="outline">Clear Selection</Button>
+        <Button variant="outline" onClick={selectAllUnpaid}>
+          Select All Unpaid
+        </Button>
+        <Button
+          variant="outline"
+          onClick={() => setSelectedEmployees(new Set())}
+        >
+          Clear Selection
+        </Button>
       </div>
       {/* Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
         <Card>
           <CardContent className="p-4">
             <p className="text-sm text-muted-foreground">Pending Payments</p>
-            <p className="text-xl font-semibold">₹0</p>
-            <p className="text-sm text-muted-foreground">0 employees</p>
+            <p className="text-xl font-semibold">
+              ₹
+              {filteredSummary
+                .filter((s) => s.status === "Unpaid")
+                .reduce((sum, s) => sum + s.payment_amount, 0)}
+            </p>
+            <p className="text-sm text-muted-foreground">
+              {filteredSummary.filter((s) => s.status === "Unpaid").length}{" "}
+              employees
+            </p>
           </CardContent>
         </Card>
 
         <Card>
           <CardContent className="p-4">
             <p className="text-sm text-muted-foreground">Paid This Period</p>
-            <p className="text-xl font-semibold">₹0</p>
+            <p className="text-xl font-semibold">
+              ₹
+              {filteredSummary
+                .filter((s) => s.status === "Paid")
+                .reduce((sum, s) => sum + s.payment_amount, 0)}
+            </p>
             <p className="text-sm text-muted-foreground">
-              0 payments completed
+              {filteredSummary.filter((s) => s.status === "Paid").length}{" "}
+              payments completed
             </p>
           </CardContent>
         </Card>
@@ -376,7 +453,7 @@ const FinanceDashboard = () => {
         <Card>
           <CardContent className="p-4">
             <p className="text-sm text-muted-foreground">Total Employees</p>
-            <p className="text-xl font-semibold">0</p>
+            <p className="text-xl font-semibold">{filteredSummary.length}</p>
             <p className="text-sm text-muted-foreground">Aug 2025</p>
           </CardContent>
         </Card>
@@ -384,7 +461,9 @@ const FinanceDashboard = () => {
         <Card>
           <CardContent className="p-4">
             <p className="text-sm text-muted-foreground">Total Hours</p>
-            <p className="text-xl font-semibold">0h</p>
+            <p className="text-xl font-semibold">
+              {filteredSummary.reduce((sum, s) => sum + s.approved_hours, 0)}h
+            </p>
             <p className="text-sm text-muted-foreground">Approved hours</p>
           </CardContent>
         </Card>
@@ -435,149 +514,182 @@ const FinanceDashboard = () => {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-12">
-                      <Checkbox
-                        checked={
-                          selectedEmployees.size ===
-                            filteredSummary.filter((s) => s.status === "Unpaid")
-                              .length &&
-                          filteredSummary.filter((s) => s.status === "Unpaid")
-                            .length > 0
-                        }
-                        onCheckedChange={(checked) => {
-                          if (checked) {
-                            selectAllUnpaid();
-                          } else {
-                            setSelectedEmployees(new Set());
-                          }
-                        }}
-                      />
-                    </TableHead>
-                    <TableHead>Employee</TableHead>
-                    <TableHead>Email</TableHead>
-                    <TableHead>Project</TableHead>
-                    <TableHead>Hours</TableHead>
-                    <TableHead>Rate</TableHead>
-                    <TableHead>Amount</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredSummary.map((summary) => (
-                    <TableRow key={summary.employee_id}>
-                      <TableCell>
+              {loading ? (
+                <div className="flex justify-center items-center py-8">
+                  <svg
+                    className="animate-spin h-8 w-8 text-muted-foreground"
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                  >
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                    ></circle>
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                    ></path>
+                  </svg>
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-12">
                         <Checkbox
-                          checked={selectedEmployees.has(summary.employee_id)}
-                          onCheckedChange={() =>
-                            toggleEmployeeSelection(summary.employee_id)
+                          checked={
+                            selectedEmployees.size ===
+                              filteredSummary.filter(
+                                (s) => s.status === "Unpaid"
+                              ).length &&
+                            filteredSummary.filter((s) => s.status === "Unpaid")
+                              .length > 0
                           }
-                          disabled={summary.status === "Paid"}
+                          onCheckedChange={(checked) => {
+                            if (checked) {
+                              selectAllUnpaid();
+                            } else {
+                              setSelectedEmployees(new Set());
+                            }
+                          }}
                         />
-                      </TableCell>
-                      <TableCell>
-                        <div>
-                          <div className="font-medium">{summary.name}</div>
-                          <div className="text-sm text-muted-foreground">
-                            ID: {summary.employee_number}
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        {summary.email}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className="text-xs">
-                          {summary.project_name}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>{summary.approved_hours}h</TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          {editingRate === summary.employee_id ? (
-                            <div className="flex items-center gap-2">
-                              <Input
-                                type="number"
-                                value={newRate}
-                                onChange={(e) =>
-                                  setNewRate(Number(e.target.value))
-                                }
-                                className="w-20 h-8"
-                              />
-                              <Button
-                                size="sm"
-                                onClick={() =>
-                                  handleUpdateRate(summary.employee_id, newRate)
-                                }
-                              >
-                                Save
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => setEditingRate(null)}
-                              >
-                                Cancel
-                              </Button>
-                            </div>
-                          ) : (
-                            <div className="flex items-center gap-2">
-                              <span>₹{summary.hourly_rate}/hr</span>
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => {
-                                  setEditingRate(summary.employee_id);
-                                  setNewRate(summary.hourly_rate);
-                                }}
-                              >
-                                <Edit2 className="h-3 w-3" />
-                              </Button>
-                            </div>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell className="font-medium">
-                        ₹{summary.payment_amount.toLocaleString()}
-                      </TableCell>
-                      <TableCell>
-                        <Badge
-                          variant={
-                            summary.status === "Paid" ? "default" : "secondary"
-                          }
-                        >
-                          {summary.status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => generateInvoice(summary)}
-                          >
-                            <FileText className="h-4 w-4 mr-1" />
-                            Invoice
-                          </Button>
-                          {summary.status === "Unpaid" &&
-                            summary.approved_hours > 0 && (
-                              <Button
-                                size="sm"
-                                onClick={() => handleReleasePayment(summary)}
-                              >
-                                <DollarSign className="h-4 w-4 mr-1" />
-                                Release Payment
-                              </Button>
-                            )}
-                        </div>
-                      </TableCell>
+                      </TableHead>
+                      <TableHead>Employee</TableHead>
+                      <TableHead>Email</TableHead>
+                      <TableHead>Project</TableHead>
+                      <TableHead>Hours</TableHead>
+                      <TableHead>Rate</TableHead>
+                      <TableHead>Amount</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Actions</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredSummary.map((summary) => (
+                      <TableRow key={summary.id}>
+                        <TableCell>
+                          <Checkbox
+                            checked={selectedEmployees.has(summary.employee_id)}
+                            onCheckedChange={() =>
+                              toggleEmployeeSelection(summary.employee_id)
+                            }
+                            disabled={summary.status === "Paid"}
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <div>
+                            <div className="font-medium">
+                              {summary.employee_name}
+                            </div>
+                            <div className="text-sm text-muted-foreground">
+                              ID: {summary.employee_id}
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground">
+                          {summary.email}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className="text-xs">
+                            {summary.project}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>{summary.hours}h</TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            {editingRate === summary.employee_id ? (
+                              <div className="flex items-center gap-2">
+                                <Input
+                                  type="number"
+                                  value={newRate}
+                                  onChange={(e) =>
+                                    setNewRate(Number(e.target.value))
+                                  }
+                                  className="w-20 h-8"
+                                />
+                                <Button
+                                  size="sm"
+                                  onClick={() =>
+                                    handleUpdateRate(
+                                      summary.employee_id,
+                                      newRate
+                                    )
+                                  }
+                                >
+                                  Save
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => setEditingRate(null)}
+                                >
+                                  Cancel
+                                </Button>
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-2">
+                                <span>₹{summary.rate}/hr</span>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => {
+                                    setEditingRate(summary.employee_id);
+                                    setNewRate(summary.rate);
+                                  }}
+                                >
+                                  <Edit2 className="h-3 w-3" />
+                                </Button>
+                              </div>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell className="font-medium">
+                          ₹{summary.payment_amount}
+                        </TableCell>
+                        <TableCell>
+                          <Badge
+                            variant={
+                              summary.status === "Paid"
+                                ? "default"
+                                : "secondary"
+                            }
+                          >
+                            {summary.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => generateInvoice(summary)}
+                            >
+                              <FileText className="h-4 w-4 mr-1" />
+                              Invoice
+                            </Button>
+                            {summary.status === "Unpaid" &&
+                              summary.approved_hours > 0 && (
+                                <Button
+                                  size="sm"
+                                  onClick={() => handleReleasePayment(summary)}
+                                >
+                                  <DollarSign className="h-4 w-4 mr-1" />
+                                  Release Payment
+                                </Button>
+                              )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -703,7 +815,7 @@ const FinanceDashboard = () => {
                           </div>
                         </TableCell>
                         <TableCell className="font-medium">
-                          ₹{bonus.amount.toLocaleString()}
+                          ₹{bonus.amount}
                         </TableCell>
                         <TableCell>
                           {format(new Date(bonus.month), "MMM yyyy")}
@@ -765,7 +877,7 @@ const FinanceDashboard = () => {
                         </div>
                       </TableCell>
                       <TableCell className="font-medium">
-                        ₹{failure.amount.toLocaleString()}
+                        ₹{failure.amount}
                       </TableCell>
                       <TableCell>{failure.reason}</TableCell>
                       <TableCell>{failure.retry_count}</TableCell>
