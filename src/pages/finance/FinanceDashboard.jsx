@@ -18,7 +18,6 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   AlertTriangle,
-  ArrowLeft,
   Ban,
   CreditCard,
   DownloadIcon,
@@ -39,13 +38,20 @@ import {
 } from "@/components/ui/table";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Edit2, FileText, DollarSign, AlertCircle } from "lucide-react";
-import { NavLink } from "react-router-dom";
 import { useDispatch } from "react-redux";
 import { logout } from "@/redux/features/auth/authSlice";
 import { toast } from "sonner";
-import axiosInstance from "@/services/axiosInstance"; // Import axios instance
+import { jsPDF } from "jspdf";
+import axiosInstance from "@/services/axiosInstance";
 
 const FinanceDashboard = () => {
   const [activeTab, setActiveTab] = useState("overview");
@@ -66,153 +72,49 @@ const FinanceDashboard = () => {
     account_holder_name: "",
     upi_id: "",
   });
-  const [filteredSummary, setFilteredSummary] = useState([]); // State to hold imported data
-  const [loading, setLoading] = useState(false); // State for data fetching
-  const [importing, setImporting] = useState(false); // State for CSV import
+  const [filteredSummary, setFilteredSummary] = useState([]);
+  const [bonuses, setBonuses] = useState([]);
+  const [paymentFailures, setPaymentFailures] = useState([]);
+  const [disputes, setDisputes] = useState([]);
+  const [bankDetails, setBankDetails] = useState([]);
+  const [blockedEmployees, setBlockedEmployees] = useState([]);
+  const [invoices, setInvoices] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [bonusesLoading, setBonusesLoading] = useState(false);
+  const [failuresLoading, setFailuresLoading] = useState(false);
+  const [disputesLoading, setDisputesLoading] = useState(false);
+  const [bankDetailsLoading, setBankDetailsLoading] = useState(false);
+  const [blockedLoading, setBlockedLoading] = useState(false);
+  const [invoicesLoading, setInvoicesLoading] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false);
+  const [selectedSummary, setSelectedSummary] = useState(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
   const dispatch = useDispatch();
 
-  const tabs = [
-    "Overview",
-    "Bonus",
-    "Failed Payments",
-    "Payment History",
-    "Disputes",
-    "Bank Details",
-    "Blocked",
-    "Invoices",
-  ];
-
-  // Dummy data for employees (unchanged)
-  const employees = [
-    {
-      id: "1",
-      name: "John Doe",
-      employee_id: "EMP001",
-      email: "john.doe@example.com",
-    },
-    {
-      id: "2",
-      name: "Jane Smith",
-      employee_id: "EMP002",
-      email: "jane.smith@example.com",
-    },
-    {
-      id: "3",
-      name: "Alice Johnson",
-      employee_id: "EMP003",
-      email: "alice.johnson@example.com",
-    },
-  ];
-
-  // Dummy data for bonuses, paymentFailures, disputes, bankDetails, blockedEmployees (unchanged)
-  const bonuses = [
-    {
-      id: "1",
-      employee: { name: "John Doe", employee_id: "EMP001" },
-      amount: 5000,
-      month: "2025-08-01",
-      status: "approved",
-    },
-    {
-      id: "2",
-      employee: { name: "Jane Smith", employee_id: "EMP002" },
-      amount: 3000,
-      month: "2025-08-01",
-      status: "pending",
-    },
-  ];
-
-  const paymentFailures = [
-    {
-      id: "1",
-      employee: { name: "John Doe", employee_id: "EMP001" },
-      amount: 80000,
-      reason: "Invalid bank details",
-      retry_count: 2,
-      retry_status: "pending",
-    },
-    {
-      id: "2",
-      employee: { name: "Alice Johnson", employee_id: "EMP003" },
-      amount: 66000,
-      reason: "Insufficient funds",
-      retry_count: 1,
-      retry_status: "pending",
-    },
-  ];
-
-  const disputes = [
-    {
-      id: "1",
-      employee: { name: "Jane Smith", employee_id: "EMP002" },
-      title: "Incorrect Hours",
-      category: "Payroll",
-      priority: "high",
-      status: "open",
-      created_at: "2025-08-01",
-    },
-    {
-      id: "2",
-      employee: { name: "John Doe", employee_id: "EMP001" },
-      title: "Bonus Dispute",
-      category: "Bonus",
-      priority: "medium",
-      status: "resolved",
-      created_at: "2025-07-15",
-    },
-  ];
-
-  const bankDetails = [
-    {
-      id: "1",
-      employee: { name: "John Doe", employee_id: "EMP001" },
-      bank_name: "State Bank of India",
-      account_number: "1234567890",
-      is_verified: true,
-      is_blocked: false,
-    },
-    {
-      id: "2",
-      employee: { name: "Jane Smith", employee_id: "EMP002" },
-      bank_name: "HDFC Bank",
-      account_number: "9876543210",
-      is_verified: false,
-      is_blocked: false,
-    },
-  ];
-
-  const blockedEmployees = [
-    {
-      id: "3",
-      name: "Alice Johnson",
-      employee_id: "EMP003",
-      department: "Engineering",
-      block_reason: "Incomplete documentation",
-      payroll_blocked: true,
-    },
-  ];
-
-  // Fetch data from backend on mount
   useEffect(() => {
     fetchSummaries();
-  }, []);
+  }, [searchQuery, statusFilter]);
 
-  // API call to fetch summaries
   const fetchSummaries = async () => {
-    setLoading(true); // Start loading
+    setLoading(true);
     try {
-      const response = await axiosInstance.get("api/v1/summary/data");
-      console.log(response.data);
+      const params = {};
+      if (searchQuery) params.employee_name = searchQuery; // Change 'name' to 'employee_name'
+      if (statusFilter !== "all") params.status = statusFilter;
+      const response = await axiosInstance.get("api/v1/summary/data", {
+        params,
+      });
       setFilteredSummary(response.data);
     } catch (error) {
       console.error("Error fetching summaries:", error);
       toast.error("Failed to load summaries");
     } finally {
-      setLoading(false); // Stop loading
+      setLoading(false);
     }
   };
 
-  // Handle CSV file import
   const handleImport = async (event) => {
     const file = event.target.files[0];
     if (!file) {
@@ -222,7 +124,7 @@ const FinanceDashboard = () => {
 
     const formData = new FormData();
     formData.append("csvFile", file);
-    setImporting(true); // Start importing
+    setImporting(true);
     try {
       await axiosInstance.post("api/v1/summary/import", formData, {
         headers: {
@@ -230,16 +132,97 @@ const FinanceDashboard = () => {
         },
       });
       toast.success("Data imported successfully");
-      fetchSummaries(); // Refresh data after import
+      fetchSummaries();
     } catch (error) {
       console.error("Error importing data:", error);
       toast.error("Failed to import data");
     } finally {
-      setImporting(false); // Stop importing
+      setImporting(false);
     }
   };
 
-  // Helper functions (unchanged)
+  const handleExport = async () => {
+    try {
+      const params = {};
+      if (searchQuery) params.employee_name = searchQuery; // Change 'name' to 'employee_name'
+      if (statusFilter !== "all") params.status = statusFilter;
+      const response = await axiosInstance.get("api/v1/summary/export", {
+        params,
+        responseType: "blob",
+      });
+
+      const url = URL.createObjectURL(response.data);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `payroll_summary_${new Date()
+        .toISOString()
+        .slice(0, 10)}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      toast.success("Payroll summary exported successfully!");
+    } catch (error) {
+      console.error("Error exporting summary:", error);
+      toast.error("Failed to export summary");
+    }
+  };
+
+  const handleRetryPayment = async (id) => {
+    try {
+      await axiosInstance.post(`api/v1/payment-failures/retry/${id}`);
+      toast.success("Payment retry initiated");
+      fetchFailedPayments();
+    } catch (error) {
+      console.error("Error retrying payment:", error);
+      toast.error("Failed to retry payment");
+    }
+  };
+
+  const handleAllocateBonus = async () => {
+    try {
+      await axiosInstance.post("api/v1/bonus/allocate", bonusForm);
+      toast.success("Bonus allocated successfully");
+      setBonusForm({ employee_id: "", amount: 0, month: "", reason: "" });
+      fetchBonuses();
+    } catch (error) {
+      console.error("Error allocating bonus:", error);
+      toast.error("Failed to allocate bonus");
+    }
+  };
+
+  const handleAddBankDetails = async () => {
+    try {
+      await axiosInstance.post("api/v1/bank-details/add", bankForm);
+      toast.success("Bank details added successfully");
+      setBankForm({
+        employee_id: "",
+        bank_name: "",
+        account_number: "",
+        ifsc_code: "",
+        account_holder_name: "",
+        upi_id: "",
+      });
+      fetchBankDetails();
+    } catch (error) {
+      console.error("Error adding bank details:", error);
+      toast.error("Failed to add bank details");
+    }
+  };
+
+  const handleUnblockEmployee = async (employee_id) => {
+    try {
+      await axiosInstance.post(
+        `api/v1/blocked-employees/unblock/${employee_id}`
+      );
+      toast.success("Employee unblocked successfully");
+      fetchBlockedEmployees();
+    } catch (error) {
+      console.error("Error unblocking employee:", error);
+      toast.error("Failed to unblock employee");
+    }
+  };
+
   const selectAllUnpaid = () => {
     const unpaidIds = filteredSummary
       .filter((s) => s.status === "Unpaid")
@@ -257,32 +240,88 @@ const FinanceDashboard = () => {
     setSelectedEmployees(newSelected);
   };
 
-  const handleUpdateRate = (employeeId, rate) => {
-    setFilteredSummary((prevSummary) =>
-      prevSummary.map((summary) =>
-        summary.employee_id === employeeId
-          ? {
-              ...summary,
-              rate: rate, // Update the rate
-              payment_amount: summary.hours * rate, // Recalculate payment_amount
-            }
-          : summary
-      )
-    );
-    setEditingRate(null); // Exit editing mode
-    toast.success(`Rate updated to ₹${rate}/hr for employee ${employeeId}`);
+  const handleUpdateRate = async (employeeId, rate) => {
+    try {
+      await axiosInstance.put(`api/v1/summary/update-rate/${employeeId}`, {
+        rate,
+      });
+      setFilteredSummary((prevSummary) =>
+        prevSummary.map((summary) =>
+          summary.employee_id === employeeId
+            ? {
+                ...summary,
+                rate: rate,
+                amount: summary.hours * rate,
+              }
+            : summary
+        )
+      );
+      setEditingRate(null);
+      toast.success(`Rate updated to ₹${rate}/hr for employee ${employeeId}`);
+    } catch (error) {
+      console.error("Error updating rate:", error);
+      toast.error("Failed to update rate");
+    }
   };
 
   const generateInvoice = (summary) => {
-    console.log(`Generating invoice for employee ${summary.name}`);
+    setSelectedSummary(summary);
+    setIsInvoiceModalOpen(true);
   };
 
-  const handleReleasePayment = (summary) => {
-    console.log(`Releasing payment for employee ${summary.name}`);
+  const handleExportPDF = () => {
+    try {
+      const doc = new jsPDF();
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(20);
+      doc.text("Invoice", 20, 20);
+      doc.setFontSize(12);
+      doc.text(
+        `Date: ${new Date().toLocaleDateString("en-US", {
+          month: "long",
+          day: "2-digit",
+          year: "numeric",
+        })}`,
+        20,
+        30
+      );
+      doc.setFontSize(14);
+      doc.text("Employee Details", 20, 50);
+      doc.setFontSize(12);
+      doc.text(`Employee ID: ${selectedSummary.employee_id}`, 20, 60);
+      doc.text(`Name: ${selectedSummary.employee_name}`, 20, 70);
+      doc.text(`Email: ${selectedSummary.email}`, 20, 80);
+      doc.text(`Project: ${selectedSummary.project}`, 20, 90);
+      doc.setFontSize(14);
+      doc.text("Payment Details", 20, 110);
+      doc.setFontSize(12);
+      doc.text(`Hours Worked: ${selectedSummary.hours}h`, 20, 120);
+      doc.text(`Rate: ₹${selectedSummary.rate}/hr`, 20, 130);
+      doc.text(`Total Amount: ₹${selectedSummary.amount}`, 20, 140);
+      doc.text(`Status: ${selectedSummary.status}`, 20, 150);
+      doc.save(
+        `invoice_${selectedSummary.employee_id}_${new Date()
+          .toISOString()
+          .slice(0, 10)}.pdf`
+      );
+      toast.success("Invoice exported successfully!");
+    } catch (error) {
+      console.error("Error exporting PDF:", error);
+      toast.error("Failed to export invoice as PDF");
+    }
   };
 
-  const handleAddBankDetails = () => {
-    console.log("Adding bank details:", bankForm);
+  const handleReleasePayment = async (summary) => {
+    try {
+      await axiosInstance.post(
+        `api/v1/summary/release-payment/${summary.employee_id}`
+      );
+      toast.success(`Payment released for ${summary.employee_name}`);
+      fetchSummaries();
+    } catch (error) {
+      console.error("Error releasing payment:", error);
+      toast.error("Failed to release payment");
+    }
   };
 
   const generateMonthOptions = () => [
@@ -321,7 +360,6 @@ const FinanceDashboard = () => {
           </div>
         </div>
       </div>
-      {/* Filters and Import */}
       <div className="grid grid-cols-1 sm:grid-cols-5 gap-4">
         <Select>
           <SelectTrigger>
@@ -334,18 +372,16 @@ const FinanceDashboard = () => {
             <SelectItem value="monthly-may-2025">May 2025</SelectItem>
           </SelectContent>
         </Select>
-
-        <Select>
+        <Select value={statusFilter} onValueChange={setStatusFilter}>
           <SelectTrigger>
             <SelectValue placeholder="All Status" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Status</SelectItem>
-            <SelectItem value="paid">Paid</SelectItem>
-            <SelectItem value="unpaid">Unpaid</SelectItem>
+            <SelectItem value="Paid">Paid</SelectItem>
+            <SelectItem value="Unpaid">Unpaid</SelectItem>
           </SelectContent>
         </Select>
-
         <Select>
           <SelectTrigger>
             <SelectValue placeholder="All Projects" />
@@ -354,11 +390,13 @@ const FinanceDashboard = () => {
             <SelectItem value="all-projects">All Projects</SelectItem>
           </SelectContent>
         </Select>
-
-        <Input placeholder="Search employees..." />
-
+        <Input
+          placeholder="Search employees by name..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+        />
         <div className="flex items-center justify-center gap-2">
-          <Button className="flex items-center gap-2">
+          <Button className="flex items-center gap-2" onClick={handleExport}>
             <DownloadIcon className="w-4 h-4" /> Export
           </Button>
           <label htmlFor="import-file" className="cursor-pointer">
@@ -404,52 +442,27 @@ const FinanceDashboard = () => {
           />
         </div>
       </div>
-      {/* Actions */}
-      <div className="flex gap-4">
-        <Button variant="outline" onClick={selectAllUnpaid}>
-          Select All Unpaid
-        </Button>
-        <Button
-          variant="outline"
-          onClick={() => setSelectedEmployees(new Set())}
-        >
-          Clear Selection
-        </Button>
-      </div>
-      {/* Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
         <Card>
           <CardContent className="p-4">
             <p className="text-sm text-muted-foreground">Pending Payments</p>
-            <p className="text-xl font-semibold">
-              ₹
-              {filteredSummary
-                .filter((s) => s.status === "Unpaid")
-                .reduce((sum, s) => sum + s.payment_amount, 0)}
-            </p>
+            <p className="text-xl font-semibold">₹ 0.00</p>
             <p className="text-sm text-muted-foreground">
               {filteredSummary.filter((s) => s.status === "Unpaid").length}{" "}
               employees
             </p>
           </CardContent>
         </Card>
-
         <Card>
           <CardContent className="p-4">
             <p className="text-sm text-muted-foreground">Paid This Period</p>
-            <p className="text-xl font-semibold">
-              ₹
-              {filteredSummary
-                .filter((s) => s.status === "Paid")
-                .reduce((sum, s) => sum + s.payment_amount, 0)}
-            </p>
+            <p className="text-xl font-semibold">₹ 0.00</p>
             <p className="text-sm text-muted-foreground">
               {filteredSummary.filter((s) => s.status === "Paid").length}{" "}
               payments completed
             </p>
           </CardContent>
         </Card>
-
         <Card>
           <CardContent className="p-4">
             <p className="text-sm text-muted-foreground">Total Employees</p>
@@ -457,18 +470,16 @@ const FinanceDashboard = () => {
             <p className="text-sm text-muted-foreground">Aug 2025</p>
           </CardContent>
         </Card>
-
         <Card>
           <CardContent className="p-4">
             <p className="text-sm text-muted-foreground">Total Hours</p>
             <p className="text-xl font-semibold">
-              {filteredSummary.reduce((sum, s) => sum + s.approved_hours, 0)}h
+              {filteredSummary.reduce((sum, s) => sum + s.hours, 0)}h
             </p>
             <p className="text-sm text-muted-foreground">Approved hours</p>
           </CardContent>
         </Card>
       </div>
-      {/* Tab Navigation */}
       <Tabs
         value={activeTab}
         onValueChange={setActiveTab}
@@ -484,9 +495,7 @@ const FinanceDashboard = () => {
           <TabsTrigger value="blocked">Blocked</TabsTrigger>
           <TabsTrigger value="invoices">Invoices</TabsTrigger>
         </TabsList>
-
         <TabsContent value="overview" className="space-y-6">
-          {/* Bulk Actions */}
           <div className="flex items-center gap-4 p-3 bg-muted/50 rounded-lg">
             <Button variant="outline" size="sm" onClick={selectAllUnpaid}>
               Select All Unpaid
@@ -504,7 +513,6 @@ const FinanceDashboard = () => {
               </span>
             )}
           </div>
-
           <Card>
             <CardHeader>
               <CardTitle>Monthly Payroll Summary</CardTitle>
@@ -536,6 +544,12 @@ const FinanceDashboard = () => {
                       d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                     ></path>
                   </svg>
+                </div>
+              ) : filteredSummary.length === 0 ? (
+                <div className="text-center py-8">
+                  <p className="text-muted-foreground">
+                    No payroll data available
+                  </p>
                 </div>
               ) : (
                 <Table>
@@ -650,7 +664,7 @@ const FinanceDashboard = () => {
                           </div>
                         </TableCell>
                         <TableCell className="font-medium">
-                          ₹{summary.payment_amount}
+                          ₹{summary.amount}
                         </TableCell>
                         <TableCell>
                           <Badge
@@ -674,7 +688,7 @@ const FinanceDashboard = () => {
                               Invoice
                             </Button>
                             {summary.status === "Unpaid" &&
-                              summary.approved_hours > 0 && (
+                              summary.hours > 0 && (
                                 <Button
                                   size="sm"
                                   onClick={() => handleReleasePayment(summary)}
@@ -693,7 +707,6 @@ const FinanceDashboard = () => {
             </CardContent>
           </Card>
         </TabsContent>
-
         <TabsContent value="bonus" className="space-y-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <Card>
@@ -722,9 +735,12 @@ const FinanceDashboard = () => {
                       <SelectValue placeholder="Select employee" />
                     </SelectTrigger>
                     <SelectContent>
-                      {employees.map((emp) => (
-                        <SelectItem key={emp.id} value={emp.id}>
-                          {emp.name} ({emp.employee_id})
+                      {filteredSummary.map((emp) => (
+                        <SelectItem
+                          key={emp.employee_id}
+                          value={emp.employee_id}
+                        >
+                          {emp.employee_name} ({emp.employee_id})
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -777,13 +793,12 @@ const FinanceDashboard = () => {
                     placeholder="Enter reason for bonus allocation"
                   />
                 </div>
-                <Button className="w-full">
+                <Button onClick={handleAllocateBonus} className="w-full">
                   <Gift className="h-4 w-4 mr-2" />
                   Allocate Bonus
                 </Button>
               </CardContent>
             </Card>
-
             <Card>
               <CardHeader>
                 <CardTitle>Recent Bonuses</CardTitle>
@@ -792,54 +807,84 @@ const FinanceDashboard = () => {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Employee</TableHead>
-                      <TableHead>Amount</TableHead>
-                      <TableHead>Month</TableHead>
-                      <TableHead>Status</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {bonuses.slice(0, 10).map((bonus) => (
-                      <TableRow key={bonus.id}>
-                        <TableCell>
-                          <div>
-                            <div className="font-medium">
-                              {bonus.employee.name}
-                            </div>
-                            <div className="text-sm text-muted-foreground">
-                              {bonus.employee.employee_id}
-                            </div>
-                          </div>
-                        </TableCell>
-                        <TableCell className="font-medium">
-                          ₹{bonus.amount}
-                        </TableCell>
-                        <TableCell>
-                          {format(new Date(bonus.month), "MMM yyyy")}
-                        </TableCell>
-                        <TableCell>
-                          <Badge
-                            variant={
-                              bonus.status === "approved"
-                                ? "default"
-                                : "secondary"
-                            }
-                          >
-                            {bonus.status}
-                          </Badge>
-                        </TableCell>
+                {bonusesLoading ? (
+                  <div className="flex justify-center items-center py-8">
+                    <svg
+                      className="animate-spin h-8 w-8 text-muted-foreground"
+                      xmlns="http://www.w3.org/2000/svg"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                    >
+                      <circle
+                        className="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                      ></circle>
+                      <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                      ></path>
+                    </svg>
+                  </div>
+                ) : bonuses.length === 0 ? (
+                  <div className="text-center py-8">
+                    <p className="text-muted-foreground">
+                      No bonuses available
+                    </p>
+                  </div>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Employee</TableHead>
+                        <TableHead>Amount</TableHead>
+                        <TableHead>Month</TableHead>
+                        <TableHead>Status</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                    </TableHeader>
+                    <TableBody>
+                      {bonuses.slice(0, 10).map((bonus) => (
+                        <TableRow key={bonus.id}>
+                          <TableCell>
+                            <div>
+                              <div className="font-medium">
+                                {bonus.employee_name}
+                              </div>
+                              <div className="text-sm text-muted-foreground">
+                                {bonus.employee_id}
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell className="font-medium">
+                            ₹{bonus.amount}
+                          </TableCell>
+                          <TableCell>
+                            {format(new Date(bonus.month), "MMM yyyy")}
+                          </TableCell>
+                          <TableCell>
+                            <Badge
+                              variant={
+                                bonus.status === "approved"
+                                  ? "default"
+                                  : "secondary"
+                              }
+                            >
+                              {bonus.status}
+                            </Badge>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
               </CardContent>
             </Card>
           </div>
         </TabsContent>
-
         <TabsContent value="failures" className="space-y-6">
           <Card>
             <CardHeader>
@@ -852,62 +897,96 @@ const FinanceDashboard = () => {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Employee</TableHead>
-                    <TableHead>Amount</TableHead>
-                    <TableHead>Reason</TableHead>
-                    <TableHead>Retry Count</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {paymentFailures.map((failure) => (
-                    <TableRow key={failure.id}>
-                      <TableCell>
-                        <div>
-                          <div className="font-medium">
-                            {failure.employee.name}
-                          </div>
-                          <div className="text-sm text-muted-foreground">
-                            {failure.employee.employee_id}
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell className="font-medium">
-                        ₹{failure.amount}
-                      </TableCell>
-                      <TableCell>{failure.reason}</TableCell>
-                      <TableCell>{failure.retry_count}</TableCell>
-                      <TableCell>
-                        <Badge
-                          variant={
-                            failure.retry_status === "resolved"
-                              ? "default"
-                              : "destructive"
-                          }
-                        >
-                          {failure.retry_status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        {failure.retry_status !== "resolved" && (
-                          <Button size="sm" variant="outline">
-                            <AlertCircle className="h-4 w-4 mr-1" />
-                            Retry Payment
-                          </Button>
-                        )}
-                      </TableCell>
+              {failuresLoading ? (
+                <div className="flex justify-center items-center py-8">
+                  <svg
+                    className="animate-spin h-8 w-8 text-muted-foreground"
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                  >
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                    ></circle>
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                    ></path>
+                  </svg>
+                </div>
+              ) : paymentFailures.length === 0 ? (
+                <div className="text-center py-8">
+                  <p className="text-muted-foreground">
+                    No failed payments available
+                  </p>
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Employee</TableHead>
+                      <TableHead>Amount</TableHead>
+                      <TableHead>Reason</TableHead>
+                      <TableHead>Retry Count</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Actions</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {paymentFailures.map((failure) => (
+                      <TableRow key={failure.id}>
+                        <TableCell>
+                          <div>
+                            <div className="font-medium">
+                              {failure.employee_name}
+                            </div>
+                            <div className="text-sm text-muted-foreground">
+                              {failure.employee_id}
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell className="font-medium">
+                          ₹{failure.amount}
+                        </TableCell>
+                        <TableCell>{failure.reason}</TableCell>
+                        <TableCell>{failure.retry_count}</TableCell>
+                        <TableCell>
+                          <Badge
+                            variant={
+                              failure.retry_status === "resolved"
+                                ? "default"
+                                : "destructive"
+                            }
+                          >
+                            {failure.retry_status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          {failure.retry_status !== "resolved" && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleRetryPayment(failure.id)}
+                            >
+                              <AlertCircle className="h-4 w-4 mr-1" />
+                              Retry Payment
+                            </Button>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
-
         <TabsContent value="history" className="space-y-6">
           <Card>
             <CardHeader>
@@ -920,17 +999,94 @@ const FinanceDashboard = () => {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="text-center py-8">
-                <History className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                <h3 className="text-lg font-medium mb-2">Payment History</h3>
-                <p className="text-muted-foreground">
-                  Advanced payment history tracking will be implemented here
-                </p>
-              </div>
+              {invoicesLoading ? (
+                <div className="flex justify-center items-center py-8">
+                  <svg
+                    className="animate-spin h-8 w-8 text-muted-foreground"
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                  >
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                    ></circle>
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                    ></path>
+                  </svg>
+                </div>
+              ) : invoices.length === 0 ? (
+                <div className="text-center py-8">
+                  <p className="text-muted-foreground">
+                    No payment history available
+                  </p>
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Employee</TableHead>
+                      <TableHead>Amount</TableHead>
+                      <TableHead>Month</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {invoices.map((invoice) => (
+                      <TableRow key={invoice.id}>
+                        <TableCell>
+                          <div>
+                            <div className="font-medium">
+                              {invoice.employee_name}
+                            </div>
+                            <div className="text-sm text-muted-foreground">
+                              {invoice.employee_id}
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell className="font-medium">
+                          ₹{invoice.amount}
+                        </TableCell>
+                        <TableCell>
+                          {format(new Date(invoice.month), "MMM yyyy")}
+                        </TableCell>
+                        <TableCell>
+                          <Badge
+                            variant={
+                              invoice.status === "Paid"
+                                ? "default"
+                                : "secondary"
+                            }
+                          >
+                            {invoice.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => generateInvoice(invoice)}
+                          >
+                            <FileText className="h-4 w-4 mr-1" />
+                            View Invoice
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
-
         <TabsContent value="disputes" className="space-y-6">
           <Card>
             <CardHeader>
@@ -943,71 +1099,99 @@ const FinanceDashboard = () => {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Employee</TableHead>
-                    <TableHead>Title</TableHead>
-                    <TableHead>Category</TableHead>
-                    <TableHead>Priority</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Created</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {disputes.map((dispute) => (
-                    <TableRow key={dispute.id}>
-                      <TableCell>
-                        <div>
-                          <div className="font-medium">
-                            {dispute.employee.name}
-                          </div>
-                          <div className="text-sm text-muted-foreground">
-                            {dispute.employee.employee_id}
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell className="font-medium">
-                        {dispute.title}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline">{dispute.category}</Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Badge
-                          variant={
-                            dispute.priority === "high"
-                              ? "destructive"
-                              : dispute.priority === "medium"
-                              ? "default"
-                              : "secondary"
-                          }
-                        >
-                          {dispute.priority}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Badge
-                          variant={
-                            dispute.status === "resolved"
-                              ? "default"
-                              : "secondary"
-                          }
-                        >
-                          {dispute.status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        {format(new Date(dispute.created_at), "MMM dd, yyyy")}
-                      </TableCell>
+              {disputesLoading ? (
+                <div className="flex justify-center items-center py-8">
+                  <svg
+                    className="animate-spin h-8 w-8 text-muted-foreground"
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                  >
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                    ></circle>
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                    ></path>
+                  </svg>
+                </div>
+              ) : disputes.length === 0 ? (
+                <div className="text-center py-8">
+                  <p className="text-muted-foreground">No disputes available</p>
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Employee</TableHead>
+                      <TableHead>Title</TableHead>
+                      <TableHead>Category</TableHead>
+                      <TableHead>Priority</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Created</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {disputes.map((dispute) => (
+                      <TableRow key={dispute.id}>
+                        <TableCell>
+                          <div>
+                            <div className="font-medium">
+                              {dispute.employee_name}
+                            </div>
+                            <div className="text-sm text-muted-foreground">
+                              {dispute.employee_id}
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell className="font-medium">
+                          {dispute.title}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline">{dispute.category}</Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge
+                            variant={
+                              dispute.priority === "high"
+                                ? "destructive"
+                                : dispute.priority === "medium"
+                                ? "default"
+                                : "secondary"
+                            }
+                          >
+                            {dispute.priority}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge
+                            variant={
+                              dispute.status === "resolved"
+                                ? "default"
+                                : "secondary"
+                            }
+                          >
+                            {dispute.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          {format(new Date(dispute.created_at), "MMM dd, yyyy")}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
-
         <TabsContent value="bank-details" className="space-y-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <Card>
@@ -1026,16 +1210,22 @@ const FinanceDashboard = () => {
                   <Select
                     value={bankForm.employee_id}
                     onValueChange={(value) =>
-                      setBankForm((prev) => ({ ...prev, employee_id: value }))
+                      setBankForm((prev) => ({
+                        ...prev,
+                        employee_id: value,
+                      }))
                     }
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Select employee" />
                     </SelectTrigger>
                     <SelectContent>
-                      {employees.map((emp) => (
-                        <SelectItem key={emp.id} value={emp.id}>
-                          {emp.name} ({emp.employee_id})
+                      {filteredSummary.map((emp) => (
+                        <SelectItem
+                          key={emp.employee_id}
+                          value={emp.employee_id}
+                        >
+                          {emp.employee_name} ({emp.employee_id})
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -1112,7 +1302,6 @@ const FinanceDashboard = () => {
                 </Button>
               </CardContent>
             </Card>
-
             <Card>
               <CardHeader>
                 <CardTitle>Bank Details List</CardTitle>
@@ -1121,55 +1310,85 @@ const FinanceDashboard = () => {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Employee</TableHead>
-                      <TableHead>Bank</TableHead>
-                      <TableHead>Account</TableHead>
-                      <TableHead>Status</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {bankDetails.slice(0, 10).map((bank) => (
-                      <TableRow key={bank.id}>
-                        <TableCell>
-                          <div>
-                            <div className="font-medium">
-                              {bank.employee.name}
-                            </div>
-                            <div className="text-sm text-muted-foreground">
-                              {bank.employee.employee_id}
-                            </div>
-                          </div>
-                        </TableCell>
-                        <TableCell>{bank.bank_name}</TableCell>
-                        <TableCell>
-                          ***{bank.account_number.slice(-4)}
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <Badge
-                              variant={
-                                bank.is_verified ? "default" : "secondary"
-                              }
-                            >
-                              {bank.is_verified ? "Verified" : "Pending"}
-                            </Badge>
-                            {bank.is_blocked && (
-                              <Badge variant="destructive">Blocked</Badge>
-                            )}
-                          </div>
-                        </TableCell>
+                {bankDetailsLoading ? (
+                  <div className="flex justify-center items-center py-8">
+                    <svg
+                      className="animate-spin h-8 w-8 text-muted-foreground"
+                      xmlns="http://www.w3.org/2000/svg"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                    >
+                      <circle
+                        className="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                      ></circle>
+                      <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                      ></path>
+                    </svg>
+                  </div>
+                ) : bankDetails.length === 0 ? (
+                  <div className="text-center py-8">
+                    <p className="text-muted-foreground">
+                      No bank details available
+                    </p>
+                  </div>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Employee</TableHead>
+                        <TableHead>Bank</TableHead>
+                        <TableHead>Account</TableHead>
+                        <TableHead>Status</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                    </TableHeader>
+                    <TableBody>
+                      {bankDetails.slice(0, 10).map((bank) => (
+                        <TableRow key={bank.id}>
+                          <TableCell>
+                            <div>
+                              <div className="font-medium">
+                                {bank.employee_name}
+                              </div>
+                              <div className="text-sm text-muted-foreground">
+                                {bank.employee_id}
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell>{bank.bank_name}</TableCell>
+                          <TableCell>
+                            ***{bank.account_number.slice(-4)}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <Badge
+                                variant={
+                                  bank.is_verified ? "default" : "secondary"
+                                }
+                              >
+                                {bank.is_verified ? "Verified" : "Pending"}
+                              </Badge>
+                              {bank.is_blocked && (
+                                <Badge variant="destructive">Blocked</Badge>
+                              )}
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
               </CardContent>
             </Card>
           </div>
         </TabsContent>
-
         <TabsContent value="blocked" className="space-y-6">
           <Card>
             <CardHeader>
@@ -1182,24 +1401,54 @@ const FinanceDashboard = () => {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Employee</TableHead>
-                    <TableHead>Department</TableHead>
-                    <TableHead>Block Reason</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {blockedEmployees
-                    .filter((emp) => emp.payroll_blocked)
-                    .map((employee) => (
+              {blockedLoading ? (
+                <div className="flex justify-center items-center py-8">
+                  <svg
+                    className="animate-spin h-8 w-8 text-muted-foreground"
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                  >
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                    ></circle>
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                    ></path>
+                  </svg>
+                </div>
+              ) : blockedEmployees.length === 0 ? (
+                <div className="text-center py-8">
+                  <p className="text-muted-foreground">
+                    No blocked employees available
+                  </p>
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Employee</TableHead>
+                      <TableHead>Department</TableHead>
+                      <TableHead>Block Reason</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {blockedEmployees.map((employee) => (
                       <TableRow key={employee.id}>
                         <TableCell>
                           <div>
-                            <div className="font-medium">{employee.name}</div>
+                            <div className="font-medium">
+                              {employee.employee_name}
+                            </div>
                             <div className="text-sm text-muted-foreground">
                               {employee.employee_id}
                             </div>
@@ -1211,19 +1460,25 @@ const FinanceDashboard = () => {
                           <Badge variant="destructive">Blocked</Badge>
                         </TableCell>
                         <TableCell>
-                          <Button size="sm" variant="outline">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() =>
+                              handleUnblockEmployee(employee.employee_id)
+                            }
+                          >
                             <Shield className="h-4 w-4 mr-1" />
                             Unblock
                           </Button>
                         </TableCell>
                       </TableRow>
                     ))}
-                </TableBody>
-              </Table>
+                  </TableBody>
+                </Table>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
-
         <TabsContent value="invoices" className="space-y-6">
           <Card>
             <CardHeader>
@@ -1236,17 +1491,153 @@ const FinanceDashboard = () => {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="text-center py-8">
-                <Receipt className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                <h3 className="text-lg font-medium mb-2">Invoice Generation</h3>
-                <p className="text-muted-foreground">
-                  Automated invoice generation system will be implemented here
-                </p>
-              </div>
+              {invoicesLoading ? (
+                <div className="flex justify-center items-center py-8">
+                  <svg
+                    className="animate-spin h-8 w-8 text-muted-foreground"
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                  >
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                    ></circle>
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                    ></path>
+                  </svg>
+                </div>
+              ) : invoices.length === 0 ? (
+                <div className="text-center py-8">
+                  <p className="text-muted-foreground">No invoices available</p>
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Employee</TableHead>
+                      <TableHead>Amount</TableHead>
+                      <TableHead>Month</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {invoices.map((invoice) => (
+                      <TableRow key={invoice.id}>
+                        <TableCell>
+                          <div>
+                            <div className="font-medium">
+                              {invoice.employee_name}
+                            </div>
+                            <div className="text-sm text-muted-foreground">
+                              {invoice.employee_id}
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell className="font-medium">
+                          ₹{invoice.amount}
+                        </TableCell>
+                        <TableCell>
+                          {format(new Date(invoice.month), "MMM yyyy")}
+                        </TableCell>
+                        <TableCell>
+                          <Badge
+                            variant={
+                              invoice.status === "Paid"
+                                ? "default"
+                                : "secondary"
+                            }
+                          >
+                            {invoice.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => generateInvoice(invoice)}
+                          >
+                            <FileText className="h-4 w-4 mr-1" />
+                            View Invoice
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Invoice Modal */}
+      {selectedSummary && (
+        <Dialog open={isInvoiceModalOpen} onOpenChange={setIsInvoiceModalOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>
+                Invoice for {selectedSummary.employee_name}
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <h3 className="font-semibold">Employee Information</h3>
+                <p className="text-sm text-muted-foreground">
+                  ID: {selectedSummary.employee_id}
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  Name: {selectedSummary.employee_name}
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  Email: {selectedSummary.email}
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  Project: {selectedSummary.project}
+                </p>
+              </div>
+              <div>
+                <h3 className="font-semibold">Payment Details</h3>
+                <p className="text-sm text-muted-foreground">
+                  Hours Worked: {selectedSummary.hours}h
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  Rate: ₹{selectedSummary.rate}/hr
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  Total Amount: ₹{selectedSummary.amount}
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  Status: {selectedSummary.status}
+                </p>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => setIsInvoiceModalOpen(false)}
+              >
+                Close
+              </Button>
+              <Button
+                className="flex items-center gap-2"
+                onClick={handleExportPDF}
+              >
+                <DownloadIcon className="h-4 w-4" />
+                Export as PDF
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 };
