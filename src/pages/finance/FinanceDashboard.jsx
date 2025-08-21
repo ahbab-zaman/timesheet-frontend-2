@@ -51,7 +51,8 @@ import { useDispatch } from "react-redux";
 import { logout } from "@/redux/features/auth/authSlice";
 import { toast } from "sonner";
 import { jsPDF } from "jspdf";
-import axiosInstance from "@/services/axiosInstance";
+import axiosInstance from "../../services/axiosInstance";
+import PaymentTracker from "../../components/PaymentTracker";
 
 const FinanceDashboard = () => {
   const [activeTab, setActiveTab] = useState("overview");
@@ -101,7 +102,7 @@ const FinanceDashboard = () => {
     setLoading(true);
     try {
       const params = {};
-      if (searchQuery) params.employee_name = searchQuery; // Change 'name' to 'employee_name'
+      if (searchQuery) params.employee_name = searchQuery;
       if (statusFilter !== "all") params.status = statusFilter;
       const response = await axiosInstance.get("api/v1/summary/data", {
         params,
@@ -144,7 +145,7 @@ const FinanceDashboard = () => {
   const handleExport = async () => {
     try {
       const params = {};
-      if (searchQuery) params.employee_name = searchQuery; // Change 'name' to 'employee_name'
+      if (searchQuery) params.employee_name = searchQuery;
       if (statusFilter !== "all") params.status = statusFilter;
       const response = await axiosInstance.get("api/v1/summary/export", {
         params,
@@ -313,14 +314,37 @@ const FinanceDashboard = () => {
 
   const handleReleasePayment = async (summary) => {
     try {
-      await axiosInstance.post(
+      // Validate employee_id
+      if (!summary.employee_id || typeof summary.employee_id !== "string") {
+        console.error("Invalid or missing employee_id:", summary.employee_id);
+        toast.error("Invalid employee ID");
+        return;
+      }
+      console.log("Releasing payment for employee_id:", summary.employee_id);
+      const response = await axiosInstance.post(
         `api/v1/summary/release-payment/${summary.employee_id}`
       );
+      console.log("API Response:", response.data);
       toast.success(`Payment released for ${summary.employee_name}`);
-      fetchSummaries();
+      setFilteredSummary((prevSummary) =>
+        prevSummary.map((item) =>
+          item.employee_id === summary.employee_id
+            ? { ...item, status: "Paid" }
+            : item
+        )
+      );
     } catch (error) {
-      console.error("Error releasing payment:", error);
-      toast.error("Failed to release payment");
+      console.error("Error releasing payment:", {
+        status: error.response?.status,
+        data: error.response?.data,
+        message: error.message,
+        url: error.config?.url,
+      });
+      toast.error(
+        `Failed to release payment: ${
+          error.response?.data?.message || error.message
+        }`
+      );
     }
   };
 
@@ -485,8 +509,9 @@ const FinanceDashboard = () => {
         onValueChange={setActiveTab}
         className="space-y-6"
       >
-        <TabsList className="grid w-full grid-cols-8">
+        <TabsList className="grid w-full grid-cols-9">
           <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="payment-tracker">Payment Tracker</TabsTrigger>
           <TabsTrigger value="bonus">Bonus</TabsTrigger>
           <TabsTrigger value="failures">Failed Payments</TabsTrigger>
           <TabsTrigger value="history">Payment History</TabsTrigger>
@@ -687,16 +712,16 @@ const FinanceDashboard = () => {
                               <FileText className="h-4 w-4 mr-1" />
                               Invoice
                             </Button>
-                            {summary.status === "Unpaid" &&
-                              summary.hours > 0 && (
-                                <Button
-                                  size="sm"
-                                  onClick={() => handleReleasePayment(summary)}
-                                >
-                                  <DollarSign className="h-4 w-4 mr-1" />
-                                  Release Payment
-                                </Button>
-                              )}
+                            <Button
+                              size="sm"
+                              onClick={() => handleReleasePayment(summary)}
+                              disabled={
+                                summary.status === "Paid" || summary.hours === 0
+                              }
+                            >
+                              <DollarSign className="h-4 w-4 mr-1" />
+                              Release Payment
+                            </Button>
                           </div>
                         </TableCell>
                       </TableRow>
@@ -1576,6 +1601,9 @@ const FinanceDashboard = () => {
               )}
             </CardContent>
           </Card>
+        </TabsContent>
+        <TabsContent value="payment-tracker" className="space-y-6">
+          <PaymentTracker />
         </TabsContent>
       </Tabs>
 
