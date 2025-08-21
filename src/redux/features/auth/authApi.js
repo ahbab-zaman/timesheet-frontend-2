@@ -9,10 +9,6 @@ const authApi = timesheetApi.injectEndpoints({
         method: 'POST',
         body: credentials,
       }),
-    //   transformResponse: (response) => { 
-    //     const { user, token } = response;
-    //     return { user, token };
-    //   }
     }),
   }),
 });
