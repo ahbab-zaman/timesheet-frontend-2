@@ -72,6 +72,8 @@ const AdminDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [tableLoading, setTableLoading] = useState(false);
   const [search, setSearch] = useState("");
+  const [projectStatusFilter, setProjectStatusFilter] = useState("all"); // New state for project status filter
+  const [employeeStatusFilter, setEmployeeStatusFilter] = useState("all"); // New state for employee status filter
   const [openEmployeeDialog, setOpenEmployeeDialog] = useState(false);
   const [editEmployeeDialog, setEditEmployeeDialog] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
@@ -79,7 +81,6 @@ const AdminDashboard = () => {
   const [editingEmployeeId, setEditingEmployeeId] = useState(null);
   const [showProjectDialog, setShowProjectDialog] = useState(false);
   const [editingProject, setEditingProject] = useState(null);
-
   const [showRateDialog, setShowRateDialog] = useState(false);
 
   // Form states
@@ -586,173 +587,222 @@ const AdminDashboard = () => {
               <h2 className="text-xl font-semibold text-foreground">
                 Projects
               </h2>
-              <Dialog
-                open={showProjectDialog}
-                onOpenChange={setShowProjectDialog}
-              >
-                <DialogTrigger asChild>
-                  <Button onClick={openCreateProject}>
-                    <Plus className="h-4 w-4 mr-2" />
-                    New Project
-                  </Button>
-                </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>
-                      {editingProject ? "Edit Project" : "Create New Project"}
-                    </DialogTitle>
-                  </DialogHeader>
-                  <div className="space-y-4">
-                    <div>
-                      <Label htmlFor="project-name">Project Name</Label>
-                      <Input
-                        id="project-name"
-                        value={newProject.name || ""}
-                        onChange={(e) =>
-                          setNewProject({ ...newProject, name: e.target.value })
-                        }
-                        placeholder="Enter project name"
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="project-description">Description</Label>
-                      <Textarea
-                        id="project-description"
-                        value={newProject.description || ""}
-                        onChange={(e) =>
-                          setNewProject({
-                            ...newProject,
-                            description: e.target.value,
-                          })
-                        }
-                        placeholder="Enter project description"
-                      />
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <Label htmlFor="start-date">Start Date</Label>
-                        <Input
-                          id="start-date"
-                          type="date"
-                          value={newProject.start_date || ""}
-                          onChange={(e) =>
-                            setNewProject({
-                              ...newProject,
-                              start_date: e.target.value,
-                            })
-                          }
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="end-date">End Date</Label>
-                        <Input
-                          id="end-date"
-                          type="date"
-                          value={newProject.end_date || ""}
-                          onChange={(e) =>
-                            setNewProject({
-                              ...newProject,
-                              end_date: e.target.value,
-                            })
-                          }
-                        />
-                      </div>
-                    </div>
-                    <div>
-                      <Label htmlFor="project-status">Status</Label>
-                      <Select
-                        value={newProject.status || "active"}
-                        onValueChange={(value) =>
-                          setNewProject({ ...newProject, status: value })
-                        }
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select status" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="active">Active</SelectItem>
-                          <SelectItem value="completed">Completed</SelectItem>
-                          <SelectItem value="on_hold">On Hold</SelectItem>
-                          <SelectItem value="cancelled">Cancelled</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <Button
-                      onClick={editingProject ? updateProject : createProject}
-                      className="w-full"
-                    >
-                      {editingProject ? "Update Project" : "Create Project"}
+              <div className="flex items-center gap-4">
+                <Select
+                  value={projectStatusFilter}
+                  onValueChange={(value) => {
+                    console.log("Selected project status:", value); // Debug
+                    setTableLoading(true);
+                    setProjectStatusFilter(value);
+                    setTimeout(() => setTableLoading(false), 500);
+                  }}
+                >
+                  <SelectTrigger className="w-[180px]">
+                    <SelectValue placeholder="Filter by status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Projects</SelectItem>
+                    <SelectItem value="active">Active</SelectItem>
+                    <SelectItem value="completed">Completed</SelectItem>
+                    <SelectItem value="on_hold">On Hold</SelectItem>
+                    <SelectItem value="cancelled">Cancelled</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Dialog
+                  open={showProjectDialog}
+                  onOpenChange={setShowProjectDialog}
+                >
+                  <DialogTrigger asChild>
+                    <Button onClick={openCreateProject}>
+                      <Plus className="h-4 w-4 mr-2" />
+                      New Project
                     </Button>
-                  </div>
-                </DialogContent>
-              </Dialog>
-            </div>
-
-            <div className="grid gap-4">
-              {projects.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">
-                  No projects found
-                </div>
-              ) : (
-                projects.map((project) => (
-                  <Card key={project.id}>
-                    <CardHeader>
-                      <div className="flex items-center justify-between">
-                        <CardTitle className="text-lg">
-                          {project.name || "Unnamed Project"}
-                        </CardTitle>
-                        <div className="flex items-center gap-2">
-                          <Badge
-                            variant={
-                              project.status === "active"
-                                ? "default"
-                                : "secondary"
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>
+                        {editingProject ? "Edit Project" : "Create New Project"}
+                      </DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4">
+                      <div>
+                        <Label htmlFor="project-name">Project Name</Label>
+                        <Input
+                          id="project-name"
+                          value={newProject.name || ""}
+                          onChange={(e) =>
+                            setNewProject({
+                              ...newProject,
+                              name: e.target.value,
+                            })
+                          }
+                          placeholder="Enter project name"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="project-description">Description</Label>
+                        <Textarea
+                          id="project-description"
+                          value={newProject.description || ""}
+                          onChange={(e) =>
+                            setNewProject({
+                              ...newProject,
+                              description: e.target.value,
+                            })
+                          }
+                          placeholder="Enter project description"
+                        />
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <Label htmlFor="start-date">Start Date</Label>
+                          <Input
+                            id="start-date"
+                            type="date"
+                            value={newProject.start_date || ""}
+                            onChange={(e) =>
+                              setNewProject({
+                                ...newProject,
+                                start_date: e.target.value,
+                              })
                             }
-                          >
-                            {project.status || "unknown"}
-                          </Badge>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => openEditProject(project)}
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => deleteProject(project.id)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="end-date">End Date</Label>
+                          <Input
+                            id="end-date"
+                            type="date"
+                            value={newProject.end_date || ""}
+                            onChange={(e) =>
+                              setNewProject({
+                                ...newProject,
+                                end_date: e.target.value,
+                              })
+                            }
+                          />
                         </div>
                       </div>
-                    </CardHeader>
-                    <CardContent>
-                      <p className="text-muted-foreground mb-2">
-                        {project.description || "No description"}
-                      </p>
-                      <div className="flex gap-4 text-sm text-muted-foreground">
-                        {project.start_date && (
-                          <span className="flex items-center gap-1">
-                            <Calendar className="h-3 w-3" />
-                            Start:{" "}
-                            {new Date(project.start_date).toLocaleDateString()}
-                          </span>
-                        )}
-                        {project.end_date && (
-                          <span className="flex items-center gap-1">
-                            <Calendar className="h-3 w-3" />
-                            End:{" "}
-                            {new Date(project.end_date).toLocaleDateString()}
-                          </span>
-                        )}
+                      <div>
+                        <Label htmlFor="project-status">Status</Label>
+                        <Select
+                          value={newProject.status || "active"}
+                          onValueChange={(value) =>
+                            setNewProject({ ...newProject, status: value })
+                          }
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select status" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="active">Active</SelectItem>
+                            <SelectItem value="completed">Completed</SelectItem>
+                            <SelectItem value="on_hold">On Hold</SelectItem>
+                            <SelectItem value="cancelled">Cancelled</SelectItem>
+                          </SelectContent>
+                        </Select>
                       </div>
-                    </CardContent>
-                  </Card>
-                ))
-              )}
+                      <Button
+                        onClick={editingProject ? updateProject : createProject}
+                        className="w-full"
+                      >
+                        {editingProject ? "Update Project" : "Create Project"}
+                      </Button>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+              </div>
             </div>
+
+            {tableLoading ? (
+              <div className="text-center py-8">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+                <p className="mt-4 text-muted-foreground">
+                  Loading projects...
+                </p>
+              </div>
+            ) : (
+              <div className="grid gap-4">
+                {projects.filter(
+                  (project) =>
+                    projectStatusFilter === "all" ||
+                    (project.status || "").toLowerCase() === projectStatusFilter
+                ).length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    No projects found
+                  </div>
+                ) : (
+                  projects
+                    .filter(
+                      (project) =>
+                        projectStatusFilter === "all" ||
+                        (project.status || "").toLowerCase() ===
+                          projectStatusFilter
+                    )
+                    .map((project) => (
+                      <Card key={project.id}>
+                        <CardHeader>
+                          <div className="flex items-center justify-between">
+                            <CardTitle className="text-lg">
+                              {project.name || "Unnamed Project"}
+                            </CardTitle>
+                            <div className="flex items-center gap-2">
+                              <Badge
+                                variant={
+                                  project.status === "active"
+                                    ? "default"
+                                    : "secondary"
+                                }
+                              >
+                                {project.status || "unknown"}
+                              </Badge>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => openEditProject(project)}
+                              >
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => deleteProject(project.id)}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </div>
+                        </CardHeader>
+                        <CardContent>
+                          <p className="text-muted-foreground mb-2">
+                            {project.description || "No description"}
+                          </p>
+                          <div className="flex gap-4 text-sm text-muted-foreground">
+                            {project.start_date && (
+                              <span className="flex items-center gap-1">
+                                <Calendar className="h-3 w-3" />
+                                Start:{" "}
+                                {new Date(
+                                  project.start_date
+                                ).toLocaleDateString()}
+                              </span>
+                            )}
+                            {project.end_date && (
+                              <span className="flex items-center gap-1">
+                                <Calendar className="h-3 w-3" />
+                                End:{" "}
+                                {new Date(
+                                  project.end_date
+                                ).toLocaleDateString()}
+                              </span>
+                            )}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))
+                )}
+              </div>
+            )}
           </TabsContent>
 
           {/* Assignments Tab */}
@@ -766,160 +816,183 @@ const AdminDashboard = () => {
               <h2 className="text-xl font-semibold text-foreground">
                 Employees
               </h2>
-              <Dialog
-                open={openEmployeeDialog}
-                onOpenChange={setOpenEmployeeDialog}
-              >
-                <DialogTrigger asChild>
-                  <Button>
-                    <UserPlus className="h-4 w-4 mr-2" />
-                    Add Employee
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="sm:max-w-[600px]">
-                  <DialogHeader>
-                    <DialogTitle>Add New Employee</DialogTitle>
-                    <DialogDescription className="text-gray-500">
-                      Enter the employee details below.
-                    </DialogDescription>
-                  </DialogHeader>
-                  <form onSubmit={handleAddEmployee} className="space-y-4">
-                    <div className="flex flex-col gap-2">
-                      <div>
-                        <Label
-                          htmlFor="employee_id"
-                          className="text-gray-700 font-medium capitalize"
-                        >
-                          Employee ID
-                        </Label>
-                        <Input
-                          id="employee_id"
-                          name="employee_id"
-                          type="text"
-                          placeholder="Enter Employee ID"
-                          value={employeeData.employee_id}
-                          onChange={handleInputChange}
-                          required
-                        />
-                      </div>
-                      <div>
-                        <Label
-                          htmlFor="name"
-                          className="text-gray-700 font-medium capitalize"
-                        >
-                          Name
-                        </Label>
-                        <Input
-                          id="name"
-                          name="name"
-                          type="text"
-                          placeholder="John Doe"
-                          value={employeeData.name}
-                          onChange={handleInputChange}
-                          required
-                        />
-                      </div>
-                      <div>
-                        <Label
-                          htmlFor="email"
-                          className="text-gray-700 font-medium capitalize"
-                        >
-                          Email
-                        </Label>
-                        <Input
-                          id="email"
-                          name="email"
-                          type="email"
-                          placeholder="john@gmail.com"
-                          value={employeeData.email}
-                          onChange={handleInputChange}
-                          required
-                        />
-                      </div>
-                      <div>
-                        <Label
-                          htmlFor="department"
-                          className="text-gray-700 font-medium capitalize"
-                        >
-                          Department
-                        </Label>
-                        <Input
-                          id="department"
-                          name="department"
-                          type="text"
-                          placeholder="Engineering"
-                          value={employeeData.department}
-                          onChange={handleInputChange}
-                          required
-                        />
-                      </div>
-                      <div>
-                        <Label
-                          htmlFor="position"
-                          className="text-gray-700 font-medium capitalize"
-                        >
-                          Position
-                        </Label>
-                        <Input
-                          id="position"
-                          name="position"
-                          type="text"
-                          placeholder="Software Engineer"
-                          value={employeeData.position}
-                          onChange={handleInputChange}
-                          required
-                        />
-                      </div>
-                      <div>
-                        <Label
-                          htmlFor="status"
-                          className="text-gray-700 font-medium capitalize"
-                        >
-                          Status
-                        </Label>
-                        <Select
-                          value={employeeData.status}
-                          onValueChange={(value) =>
-                            setEmployeeData({ ...employeeData, status: value })
-                          }
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select status" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="active">Active</SelectItem>
-                            <SelectItem value="inactive">Inactive</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-                    <Button type="submit" className="w-full">
+            </div>
+
+            <div className="relative mt-6 flex justify-between items-center gap-3">
+              <div>
+                <Input
+                  placeholder="Search Employee"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="pr-10"
+                />
+              </div>
+              <div className="flex items-center gap-4">
+                <Select
+                  value={employeeStatusFilter}
+                  onValueChange={(value) => {
+                    setTableLoading(true); // Trigger spinner
+                    setEmployeeStatusFilter(value);
+                    setTimeout(() => setTableLoading(false), 500); // Simulate loading
+                  }}
+                >
+                  <SelectTrigger className="w-[180px]">
+                    <SelectValue placeholder="Filter by status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Employees</SelectItem>
+                    <SelectItem value="active">Active</SelectItem>
+                    <SelectItem value="inactive">Inactive</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Dialog
+                  open={openEmployeeDialog}
+                  onOpenChange={setOpenEmployeeDialog}
+                >
+                  <DialogTrigger asChild>
+                    <Button>
+                      <UserPlus className="h-4 w-4 mr-2" />
                       Add Employee
                     </Button>
-                  </form>
-                </DialogContent>
-              </Dialog>
+                  </DialogTrigger>
+                  <DialogContent className="sm:max-w-[600px]">
+                    <DialogHeader>
+                      <DialogTitle>Add New Employee</DialogTitle>
+                      <DialogDescription className="text-gray-500">
+                        Enter the employee details below.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <form onSubmit={handleAddEmployee} className="space-y-4">
+                      <div className="flex flex-col gap-2">
+                        <div>
+                          <Label
+                            htmlFor="employee_id"
+                            className="text-gray-700 font-medium capitalize"
+                          >
+                            Employee ID
+                          </Label>
+                          <Input
+                            id="employee_id"
+                            name="employee_id"
+                            type="text"
+                            placeholder="Enter Employee ID"
+                            value={employeeData.employee_id}
+                            onChange={handleInputChange}
+                            required
+                          />
+                        </div>
+                        <div>
+                          <Label
+                            htmlFor="name"
+                            className="text-gray-700 font-medium capitalize"
+                          >
+                            Name
+                          </Label>
+                          <Input
+                            id="name"
+                            name="name"
+                            type="text"
+                            placeholder="John Doe"
+                            value={employeeData.name}
+                            onChange={handleInputChange}
+                            required
+                          />
+                        </div>
+                        <div>
+                          <Label
+                            htmlFor="email"
+                            className="text-gray-700 font-medium capitalize"
+                          >
+                            Email
+                          </Label>
+                          <Input
+                            id="email"
+                            name="email"
+                            type="email"
+                            placeholder="john@gmail.com"
+                            value={employeeData.email}
+                            onChange={handleInputChange}
+                            required
+                          />
+                        </div>
+                        <div>
+                          <Label
+                            htmlFor="department"
+                            className="text-gray-700 font-medium capitalize"
+                          >
+                            Department
+                          </Label>
+                          <Input
+                            id="department"
+                            name="department"
+                            type="text"
+                            placeholder="Engineering"
+                            value={employeeData.department}
+                            onChange={handleInputChange}
+                            required
+                          />
+                        </div>
+                        <div>
+                          <Label
+                            htmlFor="position"
+                            className="text-gray-700 font-medium capitalize"
+                          >
+                            Position
+                          </Label>
+                          <Input
+                            id="position"
+                            name="position"
+                            type="text"
+                            placeholder="Software Engineer"
+                            value={employeeData.position}
+                            onChange={handleInputChange}
+                            required
+                          />
+                        </div>
+                        <div>
+                          <Label
+                            htmlFor="status"
+                            className="text-gray-700 font-medium capitalize"
+                          >
+                            Status
+                          </Label>
+                          <Select
+                            value={employeeData.status}
+                            onValueChange={(value) =>
+                              setEmployeeData({
+                                ...employeeData,
+                                status: value,
+                              })
+                            }
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select status" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="active">Active</SelectItem>
+                              <SelectItem value="inactive">Inactive</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                      <Button type="submit" className="w-full">
+                        Add Employee
+                      </Button>
+                    </form>
+                  </DialogContent>
+                </Dialog>
+              </div>
             </div>
 
-            <div className="relative mt-6 flex items-center gap-3 max-w-[350px]">
-              <Input
-                placeholder="Search Employee"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="pr-10"
-              />
-              <Search className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" />
-            </div>
-
-            <div className="mt-6 overflow-x-auto rounded-lg border border-gray-200">
-              {tableLoading ? (
-                <div className="min-h-screen flex items-center justify-center">
-                  <div className="text-center">
-                    <Clock className="h-8 w-8 animate-spin mx-auto mb-4" />
-                    <p>Loading employees...</p>
-                  </div>
-                </div>
-              ) : (
+            {tableLoading ? (
+              <div className="text-center py-8">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+                <p className="mt-4 text-muted-foreground">
+                  Loading employees...
+                </p>
+              </div>
+            ) : (
+              <div className="mt-6 overflow-x-auto rounded-lg border border-gray-200">
                 <table className="w-full border-collapse text-left">
                   <thead className="bg-gray-100">
                     <tr>
@@ -933,7 +1006,15 @@ const AdminDashboard = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {employees.length === 0 ? (
+                    {employees
+                      .filter(
+                        (emp) =>
+                          employeeStatusFilter === "all" ||
+                          emp.status === employeeStatusFilter
+                      )
+                      .filter((emp) =>
+                        emp.name.toLowerCase().includes(search.toLowerCase())
+                      ).length === 0 ? (
                       <tr>
                         <td colSpan="7" className="text-center p-6">
                           No Employees Found
@@ -941,6 +1022,11 @@ const AdminDashboard = () => {
                       </tr>
                     ) : (
                       employees
+                        .filter(
+                          (emp) =>
+                            employeeStatusFilter === "all" ||
+                            emp.status === employeeStatusFilter
+                        )
                         .filter((emp) =>
                           emp.name.toLowerCase().includes(search.toLowerCase())
                         )
@@ -987,8 +1073,8 @@ const AdminDashboard = () => {
                     )}
                   </tbody>
                 </table>
-              )}
-            </div>
+              </div>
+            )}
 
             {/* Edit Employee Dialog */}
             <Dialog
