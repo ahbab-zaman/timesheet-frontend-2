@@ -75,6 +75,7 @@ export default function EmployeeDashboard() {
     fetchCurrentEmployee();
   }, []);
 
+  
   const handlePreviousWeek = () => {
     setCurrentWeekStart((prev) => addDays(prev, -7));
   };
