@@ -92,6 +92,8 @@ const FinanceDashboard = () => {
   const [selectedSummary, setSelectedSummary] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [currentEmployee, setCurrentEmployee] = useState(null);
+  const [employees, setEmployees] = useState([]);
   const dispatch = useDispatch();
 
   useEffect(() => {
@@ -180,17 +182,41 @@ const FinanceDashboard = () => {
     }
   };
 
-  const handleAllocateBonus = async () => {
+  useEffect(() => {
+    fetchBonuses();
+  }, []);
+
+  const fetchBonuses = async () => {
+    setBonusesLoading(true);
     try {
-      await axiosInstance.post("api/v1/bonus/allocate", bonusForm);
-      toast.success("Bonus allocated successfully");
-      setBonusForm({ employee_id: "", amount: 0, month: "", reason: "" });
-      fetchBonuses();
+      const response = await axiosInstance.get("api/v1/bonus/");
+      setBonuses(response.data.bonuses || []);
+      console.log(response.data.bonuses);
     } catch (error) {
-      console.error("Error allocating bonus:", error);
-      toast.error("Failed to allocate bonus");
+      console.error("Error fetching bonuses:", error);
+      toast.error("Failed to load bonuses");
+    } finally {
+      setBonusesLoading(false);
     }
   };
+
+  useEffect(() => {
+    const fetchCurrentEmployee = async () => {
+      try {
+        const response = await axiosInstance.get("/api/v1/employee");
+        const employeesList = response.data.employees || [];
+        setEmployees(employeesList);
+        if (employeesList.length > 0) {
+          setCurrentEmployee(employeesList[0]);
+        }
+        console.log("Fetched employee data:", employeesList);
+      } catch (error) {
+        toast.error("Failed to fetch employee details. Please try again.");
+        console.error("Error fetching current employee:", error);
+      }
+    };
+    fetchCurrentEmployee();
+  }, []);
 
   const handleAddBankDetails = async () => {
     try {
@@ -314,7 +340,6 @@ const FinanceDashboard = () => {
 
   const handleReleasePayment = async (summary) => {
     try {
-      // Validate employee_id
       if (!summary.employee_id || typeof summary.employee_id !== "string") {
         console.error("Invalid or missing employee_id:", summary.employee_id);
         toast.error("Invalid employee ID");
@@ -348,10 +373,64 @@ const FinanceDashboard = () => {
     }
   };
 
-  const generateMonthOptions = () => [
-    { value: "2025-08-01", label: "August 2025" },
-    { value: "2025-07-01", label: "July 2025" },
-  ];
+  const handleAllocateBonus = async () => {
+    try {
+      if (
+        !bonusForm.employee_id ||
+        !bonusForm.amount ||
+        !bonusForm.month ||
+        bonusForm.amount <= 0
+      ) {
+        toast.error("Please fill in all required fields with valid values");
+        return;
+      }
+
+      await axiosInstance.post("api/v1/bonus/allocate", bonusForm);
+      toast.success("Bonus allocated successfully");
+      setBonusForm({
+        employee_id: "",
+        amount: 0,
+        month: "",
+        reason: "",
+      });
+      fetchBonuses();
+    } catch (error) {
+      console.error("Error allocating bonus:", error);
+      toast.error("Failed to allocate bonus");
+    }
+  };
+
+  const generateMonthOptions = () => {
+    const currentDate = new Date();
+    const currentYear = currentDate.getFullYear();
+    const currentMonth = currentDate.getMonth(); // 0-based (0 = January, 7 = August)
+    const monthNames = [
+      "January",
+      "February",
+      "March",
+      "April",
+      "May",
+      "June",
+      "July",
+      "August",
+      "September",
+      "October",
+      "November",
+      "December",
+    ];
+    const options = [];
+
+    for (let month = 0; month <= currentMonth; month++) {
+      const monthValue = `${currentYear}-${String(month + 1).padStart(
+        2,
+        "0"
+      )}-01`;
+      const monthLabel = `${monthNames[month]} ${currentYear}`;
+      options.push({ value: monthValue, label: monthLabel });
+    }
+
+    return options;
+  };
 
   const format = (date, formatString) => {
     return new Date(date).toLocaleDateString("en-US", {
@@ -520,6 +599,8 @@ const FinanceDashboard = () => {
           <TabsTrigger value="blocked">Blocked</TabsTrigger>
           <TabsTrigger value="invoices">Invoices</TabsTrigger>
         </TabsList>
+
+        {/* Overview tab */}
         <TabsContent value="overview" className="space-y-6">
           <div className="flex items-center gap-4 p-3 bg-muted/50 rounded-lg">
             <Button variant="outline" size="sm" onClick={selectAllUnpaid}>
@@ -732,6 +813,8 @@ const FinanceDashboard = () => {
             </CardContent>
           </Card>
         </TabsContent>
+
+        {/* Bonus Tab */}
         <TabsContent value="bonus" className="space-y-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <Card>
@@ -760,14 +843,17 @@ const FinanceDashboard = () => {
                       <SelectValue placeholder="Select employee" />
                     </SelectTrigger>
                     <SelectContent>
-                      {filteredSummary.map((emp) => (
-                        <SelectItem
-                          key={emp.employee_id}
-                          value={emp.employee_id}
-                        >
-                          {emp.employee_name} ({emp.employee_id})
+                      {employees.length > 0 ? (
+                        employees.map((emp) => (
+                          <SelectItem key={emp.id} value={emp.id}>
+                            {emp.name} ({emp.id})
+                          </SelectItem>
+                        ))
+                      ) : (
+                        <SelectItem value="no-employees" disabled>
+                          No employees available
                         </SelectItem>
-                      ))}
+                      )}
                     </SelectContent>
                   </Select>
                 </div>
@@ -794,7 +880,7 @@ const FinanceDashboard = () => {
                     }
                   >
                     <SelectTrigger>
-                      <SelectValue />
+                      <SelectValue placeholder="Select month" />
                     </SelectTrigger>
                     <SelectContent>
                       {generateMonthOptions().map((option) => (
@@ -818,7 +904,7 @@ const FinanceDashboard = () => {
                     placeholder="Enter reason for bonus allocation"
                   />
                 </div>
-                <Button onClick={handleAllocateBonus} className="w-full">
+                <Button className="w-full" onClick={handleAllocateBonus}>
                   <Gift className="h-4 w-4 mr-2" />
                   Allocate Bonus
                 </Button>
@@ -891,15 +977,7 @@ const FinanceDashboard = () => {
                             {format(new Date(bonus.month), "MMM yyyy")}
                           </TableCell>
                           <TableCell>
-                            <Badge
-                              variant={
-                                bonus.status === "approved"
-                                  ? "default"
-                                  : "secondary"
-                              }
-                            >
-                              {bonus.status}
-                            </Badge>
+                            <Badge>Pending</Badge>
                           </TableCell>
                         </TableRow>
                       ))}
@@ -910,6 +988,8 @@ const FinanceDashboard = () => {
             </Card>
           </div>
         </TabsContent>
+
+        {/* Payment failure Tab */}
         <TabsContent value="failures" className="space-y-6">
           <Card>
             <CardHeader>
@@ -1012,6 +1092,8 @@ const FinanceDashboard = () => {
             </CardContent>
           </Card>
         </TabsContent>
+
+        {/* Payment History Tab */}
         <TabsContent value="history" className="space-y-6">
           <Card>
             <CardHeader>
@@ -1112,6 +1194,8 @@ const FinanceDashboard = () => {
             </CardContent>
           </Card>
         </TabsContent>
+
+        {/* Payment disputes Tab */}
         <TabsContent value="disputes" className="space-y-6">
           <Card>
             <CardHeader>
@@ -1217,6 +1301,8 @@ const FinanceDashboard = () => {
             </CardContent>
           </Card>
         </TabsContent>
+
+        {/* Bank Details Tab */}
         <TabsContent value="bank-details" className="space-y-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <Card>
@@ -1414,6 +1500,8 @@ const FinanceDashboard = () => {
             </Card>
           </div>
         </TabsContent>
+
+        {/* Employees Blocked Tab */}
         <TabsContent value="blocked" className="space-y-6">
           <Card>
             <CardHeader>
@@ -1504,6 +1592,8 @@ const FinanceDashboard = () => {
             </CardContent>
           </Card>
         </TabsContent>
+
+        {/* Employees Invoices Tab */}
         <TabsContent value="invoices" className="space-y-6">
           <Card>
             <CardHeader>
@@ -1602,6 +1692,8 @@ const FinanceDashboard = () => {
             </CardContent>
           </Card>
         </TabsContent>
+
+        {/* Payment Tracker Tab */}
         <TabsContent value="payment-tracker" className="space-y-6">
           <PaymentTracker />
         </TabsContent>
