@@ -26,8 +26,9 @@ import {
   LogOut,
   Receipt,
   Shield,
+  Trash,
 } from "lucide-react";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
   Table,
   TableBody,
@@ -73,6 +74,8 @@ const FinanceDashboard = () => {
     account_holder_name: "",
     upi_id: "",
   });
+  const [editBankModalOpen, setEditBankModalOpen] = useState(false);
+  const [editingBankDetails, setEditingBankDetails] = useState(null);
   const [filteredSummary, setFilteredSummary] = useState([]);
   const [bonuses, setBonuses] = useState([]);
   const [paymentFailures, setPaymentFailures] = useState([]);
@@ -98,6 +101,7 @@ const FinanceDashboard = () => {
 
   useEffect(() => {
     fetchSummaries();
+    fetchBankDetails();
   }, [searchQuery, statusFilter]);
 
   const fetchSummaries = async () => {
@@ -115,6 +119,19 @@ const FinanceDashboard = () => {
       toast.error("Failed to load summaries");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchBankDetails = async () => {
+    setBankDetailsLoading(true);
+    try {
+      const response = await axiosInstance.get("api/v1/bank-details/");
+      setBankDetails(response.data.bankDetails || []);
+    } catch (error) {
+      console.error("Error fetching bank details:", error);
+      toast.error("Failed to load bank details");
+    } finally {
+      setBankDetailsLoading(false);
     }
   };
 
@@ -234,6 +251,45 @@ const FinanceDashboard = () => {
     } catch (error) {
       console.error("Error adding bank details:", error);
       toast.error("Failed to add bank details");
+    }
+  };
+
+  const handleUpdateBankDetails = async () => {
+    try {
+      await axiosInstance.put(
+        `api/v1/bank-details/update/${editingBankDetails.employee_id}`,
+        editingBankDetails
+      );
+      toast.success("Bank details updated successfully");
+      setEditBankModalOpen(false);
+      setEditingBankDetails(null);
+      fetchBankDetails();
+    } catch (error) {
+      console.error("Error updating bank details:", error);
+      toast.error("Failed to update bank details");
+    }
+  };
+
+  const handleOpenEditBankModal = (bank) => {
+    setEditingBankDetails({
+      employee_id: bank.employee_id,
+      bank_name: bank.bank_name,
+      account_number: bank.account_number,
+      ifsc_code: bank.ifsc_code,
+      account_holder_name: bank.account_holder_name,
+      upi_id: bank.upi_id,
+    });
+    setEditBankModalOpen(true);
+  };
+
+  const handleDeleteBankDetails = async (employee_id) => {
+    try {
+      await axiosInstance.delete(`api/v1/bank-details/delete/${employee_id}`);
+      toast.success("Bank details deleted successfully");
+      fetchBankDetails();
+    } catch (error) {
+      console.error("Error deleting bank details:", error);
+      toast.error("Failed to delete bank details");
     }
   };
 
@@ -403,7 +459,7 @@ const FinanceDashboard = () => {
   const generateMonthOptions = () => {
     const currentDate = new Date();
     const currentYear = currentDate.getFullYear();
-    const currentMonth = currentDate.getMonth(); // 0-based (0 = January, 7 = August)
+    const currentMonth = currentDate.getMonth();
     const monthNames = [
       "January",
       "February",
@@ -1331,14 +1387,17 @@ const FinanceDashboard = () => {
                       <SelectValue placeholder="Select employee" />
                     </SelectTrigger>
                     <SelectContent>
-                      {filteredSummary.map((emp) => (
-                        <SelectItem
-                          key={emp.employee_id}
-                          value={emp.employee_id}
-                        >
-                          {emp.employee_name} ({emp.employee_id})
+                      {employees.length > 0 ? (
+                        employees.map((emp) => (
+                          <SelectItem key={emp.id} value={emp.id}>
+                            {emp.name} ({emp.id})
+                          </SelectItem>
+                        ))
+                      ) : (
+                        <SelectItem value="no-employees" disabled>
+                          No employees available
                         </SelectItem>
-                      ))}
+                      )}
                     </SelectContent>
                   </Select>
                 </div>
@@ -1458,6 +1517,7 @@ const FinanceDashboard = () => {
                         <TableHead>Bank</TableHead>
                         <TableHead>Account</TableHead>
                         <TableHead>Status</TableHead>
+                        <TableHead>Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -1491,6 +1551,25 @@ const FinanceDashboard = () => {
                               )}
                             </div>
                           </TableCell>
+                          <TableCell>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleOpenEditBankModal(bank)}
+                            >
+                              <Edit2 className="h-4 w-4 mr-1" />
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              onClick={() =>
+                                handleDeleteBankDetails(bank.employee_id)
+                              }
+                              className="ml-2"
+                            >
+                              <Trash />
+                            </Button>
+                          </TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
@@ -1499,9 +1578,100 @@ const FinanceDashboard = () => {
               </CardContent>
             </Card>
           </div>
+          {editingBankDetails && (
+            <Dialog
+              open={editBankModalOpen}
+              onOpenChange={setEditBankModalOpen}
+            >
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>
+                    Edit Bank Details for {editingBankDetails.employee_name}
+                  </DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label>Bank Name</Label>
+                    <Input
+                      value={editingBankDetails.bank_name}
+                      onChange={(e) =>
+                        setEditingBankDetails((prev) => ({
+                          ...prev,
+                          bank_name: e.target.value,
+                        }))
+                      }
+                      placeholder="Enter bank name"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Account Number</Label>
+                    <Input
+                      value={editingBankDetails.account_number}
+                      onChange={(e) =>
+                        setEditingBankDetails((prev) => ({
+                          ...prev,
+                          account_number: e.target.value,
+                        }))
+                      }
+                      placeholder="Enter account number"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>IFSC Code</Label>
+                    <Input
+                      value={editingBankDetails.ifsc_code}
+                      onChange={(e) =>
+                        setEditingBankDetails((prev) => ({
+                          ...prev,
+                          ifsc_code: e.target.value,
+                        }))
+                      }
+                      placeholder="Enter IFSC code"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Account Holder Name</Label>
+                    <Input
+                      value={editingBankDetails.account_holder_name}
+                      onChange={(e) =>
+                        setEditingBankDetails((prev) => ({
+                          ...prev,
+                          account_holder_name: e.target.value,
+                        }))
+                      }
+                      placeholder="Enter account holder name"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>UPI ID (Optional)</Label>
+                    <Input
+                      value={editingBankDetails.upi_id}
+                      onChange={(e) =>
+                        setEditingBankDetails((prev) => ({
+                          ...prev,
+                          upi_id: e.target.value,
+                        }))
+                      }
+                      placeholder="Enter UPI ID"
+                    />
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button
+                    variant="outline"
+                    onClick={() => setEditBankModalOpen(false)}
+                  >
+                    Cancel
+                  </Button>
+                  <Button onClick={handleUpdateBankDetails}>
+                    Save Changes
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          )}
         </TabsContent>
 
-        {/* Employees Blocked Tab */}
         <TabsContent value="blocked" className="space-y-6">
           <Card>
             <CardHeader>

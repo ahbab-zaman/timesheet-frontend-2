@@ -1,25 +1,9 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   Users,
   Clock,
@@ -27,14 +11,14 @@ import {
   CheckCircle,
   XCircle,
   Filter,
-  MessageSquare,
-  Settings,
-  Plus,
   Calendar,
   Search,
   ChevronDown,
   ChevronRight,
   CalendarDays,
+  BarChart3,
+  Plus,
+  Settings,
 } from "lucide-react";
 import {
   format,
@@ -45,20 +29,143 @@ import {
   startOfMonth,
   endOfMonth,
 } from "date-fns";
-import ManagerTaskManagement from "./ManagerTaskManagement";
-import { useDispatch } from "react-redux";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import TaskManagement from "./ManagerTaskManagement";
+import LeaveApproval from "./ManagerLeave";
+import NotificationSystem from "./Notification";
+import ManagerTimesheetView from "./ManagerView";
+import { toast } from "sonner";
 import { logout } from "@/redux/features/auth/authSlice";
-import toast from "react-hot-toast";
-import ManagerLeave from "./ManagerLeave";
-import Notification from "./Notification";
+import { useDispatch } from "react-redux";
+
+const TimesheetGrid = ({ timesheet }) => {
+  const weekStart = startOfWeek(new Date(timesheet.week_start_date), {
+    weekStartsOn: 1,
+  });
+  const weekDates = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
+
+  const entriesByTask = timesheet.time_entries.reduce((acc, entry) => {
+    const taskKey = entry.tasks?.task_title || "No Task";
+    if (!acc[taskKey]) {
+      acc[taskKey] = {
+        taskTitle: entry.tasks?.task_title || "No Task",
+        projectName: entry.tasks?.projects?.name || "No Project",
+        entries: {},
+      };
+    }
+    acc[taskKey].entries[entry.date] = entry.hours;
+    return acc;
+  }, {});
+
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full border border-gray-200 rounded-lg">
+        <thead>
+          <tr className="bg-gray-100">
+            <th className="text-left p-3 font-medium border-r text-sm">
+              Task Name
+            </th>
+            {weekDates.map((date) => (
+              <th
+                key={date.toISOString()}
+                className="text-center p-3 font-medium border-r min-w-[80px]"
+              >
+                <div className="text-xs text-gray-500">
+                  {format(date, "EEE")}
+                </div>
+                <div className="text-sm">{format(date, "dd")}</div>
+              </th>
+            ))}
+            <th className="text-center p-3 font-medium">Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          {Object.entries(entriesByTask).map(([taskKey, taskData]) => {
+            const taskTotal = Object.values(taskData.entries).reduce(
+              (sum, hours) => sum + (hours || 0),
+              0
+            );
+            return (
+              <tr key={taskKey} className="border-t">
+                <td className="p-3 border-r">
+                  <div className="font-medium text-sm">
+                    {taskData.taskTitle}
+                  </div>
+                  <div className="text-xs text-gray-500">
+                    {taskData.projectName}
+                  </div>
+                </td>
+                {weekDates.map((date) => {
+                  const dateStr = format(date, "yyyy-MM-dd");
+                  const hours = taskData.entries[dateStr] || 0;
+                  return (
+                    <td
+                      key={date.toISOString()}
+                      className="text-center p-3 border-r"
+                    >
+                      <div
+                        className={`text-sm font-medium ${
+                          hours > 0 ? "text-blue-600" : "text-gray-500"
+                        }`}
+                      >
+                        {hours > 0 ? `${hours}h` : "-"}
+                      </div>
+                    </td>
+                  );
+                })}
+                <td className="text-center p-3 font-bold">{taskTotal}h</td>
+              </tr>
+            );
+          })}
+          <tr className="border-t bg-gray-50">
+            <td className="p-3 border-r font-bold">Total Hours</td>
+            {weekDates.map((date) => {
+              const dateStr = format(date, "yyyy-MM-dd");
+              const dayTotal = Object.values(entriesByTask).reduce(
+                (sum, taskData) => sum + (taskData.entries[dateStr] || 0),
+                0
+              );
+              return (
+                <td
+                  key={date.toISOString()}
+                  className="text-center p-3 border-r font-bold"
+                >
+                  {dayTotal > 0 ? `${dayTotal}h` : "-"}
+                </td>
+              );
+            })}
+            <td className="text-center p-3 font-bold text-blue-600">
+              {timesheet.total_hours}h
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  );
+};
 
 const ManagerDashboard = () => {
+  const navigate = useNavigate();
   const [timesheets, setTimesheets] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedTimesheet, setSelectedTimesheet] = useState(null);
   const [rejectionComment, setRejectionComment] = useState("");
   const [filter, setFilter] = useState("submitted");
-  const [userRole, setUserRole] = useState(null);
+  const [userRole, setUserRole] = useState("manager");
   const [activeTab, setActiveTab] = useState("timesheets");
   const [employeeSearchTerm, setEmployeeSearchTerm] = useState("");
   const [expandedTimesheets, setExpandedTimesheets] = useState({});
@@ -67,35 +174,71 @@ const ManagerDashboard = () => {
     end: endOfWeek(new Date(), { weekStartsOn: 1 }),
   });
   const [quickFilter, setQuickFilter] = useState("this-week");
+  const [selectedPeriod, setSelectedPeriod] = useState("weekly");
+  const [configOpen, setConfigOpen] = useState(false);
+  const [defaultPeriod, setDefaultPeriod] = useState("weekly");
+  const [autoCreate, setAutoCreate] = useState(true);
   const dispatch = useDispatch();
+  const mockTimesheets = [
+    {
+      id: "1",
+      employee_id: "emp1",
+      week_start_date: "2025-08-18",
+      week_end_date: "2025-08-24",
+      total_hours: 40,
+      status: "submitted",
+      submitted_at: "2025-08-24T10:00:00Z",
+      comments: "Regular work week",
+      approval_stage: "pending",
+      requires_revision: false,
+      employees: { name: "John Doe", email: "john.doe@example.com" },
+      time_entries: [
+        {
+          date: "2025-08-18",
+          hours: 8,
+          description: "Development",
+          task_id: "task1",
+          tasks: { task_title: "Feature X", projects: { name: "Project A" } },
+        },
+        {
+          date: "2025-08-19",
+          hours: 8,
+          description: "Testing",
+          task_id: "task2",
+          tasks: { task_title: "Bug Fixes", projects: { name: "Project B" } },
+        },
+      ],
+    },
+    {
+      id: "2",
+      employee_id: "emp2",
+      week_start_date: "2025-08-18",
+      week_end_date: "2025-08-24",
+      total_hours: 35,
+      status: "approved",
+      submitted_at: "2025-08-23T09:00:00Z",
+      comments: "Partial week",
+      approval_stage: "approved",
+      requires_revision: false,
+      employees: { name: "Jane Smith", email: "jane.smith@example.com" },
+      time_entries: [
+        {
+          date: "2025-08-18",
+          hours: 7,
+          description: "Design",
+          task_id: "task3",
+          tasks: { task_title: "UI Design", projects: { name: "Project C" } },
+        },
+      ],
+    },
+  ];
 
   useEffect(() => {
-    // Simulate auth check
-    const user = { id: "user1" }; // Mock user
-    if (!user) {
-      // navigate("/attendance-timesheet");
-      return;
-    }
-
-    // Simulate checking manager role
-    const checkManagerRole = async () => {
-      try {
-        // Mock role check
-        const role = "manager"; // or 'admin'
-        if (role !== "manager" && role !== "admin") {
-          // navigate("/attendance-timesheet");
-          return;
-        }
-        setUserRole(role);
-        // Removed mockTimesheets assignment
-        setLoading(false);
-      } catch (error) {
-        // navigate("/attendance-timesheet");
-      }
-    };
-
-    checkManagerRole();
-  }, []);
+    setTimeout(() => {
+      setTimesheets(mockTimesheets);
+      setLoading(false);
+    }, 1000);
+  }, [filter, dateRange]);
 
   const handleQuickFilter = (value) => {
     setQuickFilter(value);
@@ -125,8 +268,6 @@ const ManagerDashboard = () => {
           end: endOfMonth(now),
         });
         break;
-      default:
-        break;
     }
   };
 
@@ -138,11 +279,9 @@ const ManagerDashboard = () => {
           : t
       )
     );
-    alert("Timesheet approved! ✅");
   };
 
   const handleReject = (timesheetId) => {
-    if (!rejectionComment.trim()) return;
     setTimesheets((prev) =>
       prev.map((t) =>
         t.id === timesheetId
@@ -150,7 +289,6 @@ const ManagerDashboard = () => {
           : t
       )
     );
-    alert("Timesheet rejected");
     setRejectionComment("");
     setSelectedTimesheet(null);
   };
@@ -173,6 +311,10 @@ const ManagerDashboard = () => {
     }));
   };
 
+  const handleSaveConfiguration = () => {
+    setSelectedPeriod(defaultPeriod);
+    setConfigOpen(false);
+  };
   const handleLogout = () => {
     dispatch(logout());
     toast.success("Logout successful.");
@@ -191,22 +333,38 @@ const ManagerDashboard = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-gray-100">
-      <div className="w-full mx-auto p-6">
-        <div className="flex justify-between items-center mb-8">
-          <div className="flex items-center gap-3">
-            <div className="bg-black rounded-full p-2">
+      <div className="mx-auto p-4 sm:p-6">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 sm:mb-8">
+          <div className="flex items-center gap-3 mb-4 sm:mb-0">
+            <div className="bg-blue-600 rounded-full p-2">
               <Users className="h-6 w-6 text-white" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold">Manager Dashboard</h1>
-              <p className="text-gray-500">
+              <h1 className="text-xl sm:text-2xl font-bold">
+                {userRole === "admin" ? "Admin Dashboard" : "Manager Dashboard"}
+              </h1>
+              <p className="text-gray-600 text-sm">
                 Manager's review helps keep project hours aligned ✅
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-4">
-            <Notification />
-            <Button variant="outline" onClick={handleLogout}>
+          <div className="flex items-center gap-2">
+            <NotificationSystem />
+            {userRole === "admin" && (
+              <Button
+                variant="outline"
+                onClick={() => navigate("/employee-management")}
+                className="flex items-center gap-2 text-sm"
+              >
+                <Settings className="h-4 w-4" />
+                Employee Management
+              </Button>
+            )}
+            <Button
+              variant="outline"
+              onClick={handleLogout}
+              className="text-sm"
+            >
               <LogOut className="h-4 w-4 mr-2" />
               Sign Out
             </Button>
@@ -214,18 +372,28 @@ const ManagerDashboard = () => {
         </div>
 
         <div className="mb-6">
-          <div className="flex gap-4 items-center">
-            <div className="flex gap-2">
+          <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center flex-wrap">
+            <div className="flex gap-2 flex-wrap">
               <Button
                 variant={activeTab === "timesheets" ? "default" : "outline"}
                 onClick={() => setActiveTab("timesheets")}
+                className="text-sm"
               >
                 <Clock className="h-4 w-4 mr-2" />
                 Timesheets
               </Button>
               <Button
+                variant={activeTab === "enhanced" ? "default" : "outline"}
+                onClick={() => setActiveTab("enhanced")}
+                className="text-sm"
+              >
+                <BarChart3 className="h-4 w-4 mr-2" />
+                Enhanced Manager View
+              </Button>
+              <Button
                 variant={activeTab === "tasks" ? "default" : "outline"}
                 onClick={() => setActiveTab("tasks")}
+                className="text-sm"
               >
                 <Plus className="h-4 w-4 mr-2" />
                 Task Management
@@ -233,6 +401,7 @@ const ManagerDashboard = () => {
               <Button
                 variant={activeTab === "leaves" ? "default" : "outline"}
                 onClick={() => setActiveTab("leaves")}
+                className="text-sm"
               >
                 <Calendar className="h-4 w-4 mr-2" />
                 Leave Requests
@@ -241,11 +410,12 @@ const ManagerDashboard = () => {
 
             {activeTab === "timesheets" && (
               <>
-                <div className="flex gap-2">
+                <div className="flex gap-2 flex-wrap">
                   <Button
                     variant={filter === "submitted" ? "default" : "outline"}
                     onClick={() => setFilter("submitted")}
                     size="sm"
+                    className="text-sm"
                   >
                     <Filter className="h-4 w-4 mr-2" />
                     Pending (
@@ -255,6 +425,7 @@ const ManagerDashboard = () => {
                     variant={filter === "approved" ? "default" : "outline"}
                     onClick={() => setFilter("approved")}
                     size="sm"
+                    className="text-sm"
                   >
                     Approved
                   </Button>
@@ -262,6 +433,7 @@ const ManagerDashboard = () => {
                     variant={filter === "rejected" ? "default" : "outline"}
                     onClick={() => setFilter("rejected")}
                     size="sm"
+                    className="text-sm"
                   >
                     Rejected
                   </Button>
@@ -269,14 +441,16 @@ const ManagerDashboard = () => {
                     variant={filter === "all" ? "default" : "outline"}
                     onClick={() => setFilter("all")}
                     size="sm"
+                    className="text-sm"
                   >
                     All
                   </Button>
                 </div>
+
                 <div className="flex items-center gap-2">
                   <CalendarDays className="h-4 w-4 text-gray-500" />
                   <Select value={quickFilter} onValueChange={handleQuickFilter}>
-                    <SelectTrigger className="w-40">
+                    <SelectTrigger className="w-40 text-sm">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -291,32 +465,99 @@ const ManagerDashboard = () => {
                     {format(dateRange.end, "MMM dd, yyyy")}
                   </div>
                 </div>
+
+                <div className="flex items-center gap-2 w-full sm:w-auto">
+                  <Search className="h-4 w-4 text-gray-500" />
+                  <Input
+                    placeholder="Search by employee name..."
+                    value={employeeSearchTerm}
+                    onChange={(e) => setEmployeeSearchTerm(e.target.value)}
+                    className="w-full sm:w-64 text-sm"
+                  />
+                  {employeeSearchTerm && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setEmployeeSearchTerm("")}
+                      className="text-xs"
+                    >
+                      Clear
+                    </Button>
+                  )}
+                </div>
+                <div>
+                  <Dialog open={configOpen} onOpenChange={setConfigOpen}>
+                    <DialogTrigger asChild>
+                      <Button variant="outline">
+                        <Settings className="h-4 w-4 mr-2" />
+                        Configure
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>
+                          Timesheet Period Configuration
+                        </DialogTitle>
+                      </DialogHeader>
+                      <div className="space-y-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700">
+                            Default Period Type
+                          </label>
+                          <Select
+                            value={defaultPeriod}
+                            onValueChange={setDefaultPeriod}
+                          >
+                            <SelectTrigger className="w-full mt-1">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="weekly">Weekly</SelectItem>
+                              <SelectItem value="biweekly">Biweekly</SelectItem>
+                              <SelectItem value="monthly">Monthly</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <label className="block text-sm font-medium text-gray-700">
+                            Auto-create Periods
+                          </label>
+                          <input
+                            type="checkbox"
+                            checked={autoCreate}
+                            onChange={(e) => setAutoCreate(e.target.checked)}
+                            className="ml-2 h-5 w-5 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                          />
+                        </div>
+                        <div className="border-t pt-4">
+                          <h3 className="text-sm font-medium text-gray-700">
+                            🕒 Department Overview
+                          </h3>
+                          <div className="mt-2 space-y-2">
+                            <p className="text-sm text-gray-600">
+                              Department: All Departments
+                            </p>
+                            <p className="text-sm text-gray-600">
+                              Default Period: {defaultPeriod}
+                            </p>
+                            <p className="text-sm text-gray-600">
+                              Auto-create: {autoCreate ? "Enabled" : "Disabled"}
+                            </p>
+                          </div>
+                        </div>
+                        <Button
+                          onClick={handleSaveConfiguration}
+                          className="w-full bg-blue-600 text-white hover:bg-blue-700 mt-4"
+                        >
+                          Save Configuration
+                        </Button>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
+                </div>
               </>
             )}
           </div>
-          {activeTab === "timesheets" && (
-            <div className="p-4">
-              <div className="flex justify-center items-center gap-2">
-                <Search className="h-4 w-4 text-gray-500" />
-                <Input
-                  placeholder="Search by employee name..."
-                  value={employeeSearchTerm}
-                  onChange={(e) => setEmployeeSearchTerm(e.target.value)}
-                  className="w-64"
-                />
-                {employeeSearchTerm && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setEmployeeSearchTerm("")}
-                    className="text-xs"
-                  >
-                    Clear
-                  </Button>
-                )}
-              </div>
-            </div>
-          )}
         </div>
 
         {activeTab === "timesheets" ? (
@@ -324,33 +565,28 @@ const ManagerDashboard = () => {
             {(() => {
               const filteredTimesheets = timesheets.filter(
                 (timesheet) =>
-                  timesheet?.employees?.name
+                  timesheet.employees?.name
                     ?.toLowerCase()
                     .includes(employeeSearchTerm.toLowerCase()) ||
-                  timesheet?.employees?.email
+                  timesheet.employees?.email
                     ?.toLowerCase()
                     .includes(employeeSearchTerm.toLowerCase())
               );
+
               return filteredTimesheets.length === 0 ? (
                 <Card>
                   <CardContent className="text-center py-8">
                     <Clock className="h-12 w-12 mx-auto text-gray-500 mb-4" />
                     <h3 className="text-lg font-medium mb-2">
-                      {filter === "submitted"
-                        ? "No timesheets for pending"
-                        : filter === "approved"
-                        ? "No timesheets for approved"
-                        : filter === "rejected"
-                        ? "No timesheets for rejected"
+                      {employeeSearchTerm
+                        ? "No matching timesheets found"
                         : "No timesheets found"}
                     </h3>
-                    <p className="text-gray-500">
-                      {filter === "submitted"
-                        ? "There are no pending timesheets to review."
-                        : filter === "approved"
-                        ? "There are no approved timesheets available."
-                        : filter === "rejected"
-                        ? "There are no rejected timesheets available."
+                    <p className="text-gray-600">
+                      {employeeSearchTerm
+                        ? `No timesheets found for "${employeeSearchTerm}"`
+                        : filter === "submitted"
+                        ? "No pending timesheets to review."
                         : `No ${filter} timesheets found.`}
                     </p>
                     {employeeSearchTerm && (
@@ -358,7 +594,7 @@ const ManagerDashboard = () => {
                         variant="outline"
                         size="sm"
                         onClick={() => setEmployeeSearchTerm("")}
-                        className="mt-2"
+                        className="mt-2 text-sm"
                       >
                         Clear Search
                       </Button>
@@ -371,10 +607,10 @@ const ManagerDashboard = () => {
                   return (
                     <Card key={timesheet.id} className="overflow-hidden">
                       <div
-                        className="flex justify-between items-center p-4 cursor-pointer hover:bg-gray-50 transition-colors border-b"
+                        className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-4 cursor-pointer hover:bg-gray-50 transition-colors border-b"
                         onClick={() => toggleTimesheet(timesheet.id)}
                       >
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-3 mb-2 sm:mb-0">
                           <div className="flex items-center gap-2">
                             {isExpanded ? (
                               <ChevronDown className="h-4 w-4 text-gray-500" />
@@ -399,10 +635,11 @@ const ManagerDashboard = () => {
                             -{" "}
                             {format(
                               new Date(timesheet.week_end_date),
-                              "dd, yyyy"
+                              "MMM dd, yyyy"
                             )}
                           </div>
                         </div>
+
                         <div className="flex items-center gap-3">
                           {getStatusBadge(timesheet.status)}
                           <div className="text-right">
@@ -418,85 +655,34 @@ const ManagerDashboard = () => {
                           </div>
                         </div>
                       </div>
+
                       {isExpanded && (
                         <CardContent className="p-0">
                           <div className="p-4 space-y-4">
                             {timesheet.time_entries.length > 0 && (
                               <div>
-                                <h4 className="font-medium mb-4">
-                                  Weekly Timesheet Grid:
+                                <h4 className="font-medium mb-4 text-sm">
+                                  {timesheet.period_type
+                                    ? `${
+                                        timesheet.period_type
+                                          .charAt(0)
+                                          .toUpperCase() +
+                                        timesheet.period_type.slice(1)
+                                      } Timesheet Grid:`
+                                    : "Weekly Timesheet Grid:"}
                                 </h4>
                                 <TimesheetGrid timesheet={timesheet} />
                               </div>
                             )}
+
                             {timesheet.comments && (
                               <div>
-                                <h4 className="font-medium mb-2">Comments:</h4>
-                                <p className="text-sm text-gray-500 bg-gray-50 p-3 rounded">
+                                <h4 className="font-medium mb-2 text-sm">
+                                  Comments:
+                                </h4>
+                                <p className="text-sm text-gray-600 bg-gray-100 p-3 rounded">
                                   {timesheet.comments}
                                 </p>
-                              </div>
-                            )}
-                            {timesheet.status === "submitted" && (
-                              <div className="flex gap-2 pt-4">
-                                <Button
-                                  onClick={() => handleApprove(timesheet.id)}
-                                >
-                                  <CheckCircle className="h-4 w-4 mr-2" />
-                                  Approve
-                                </Button>
-                                <Dialog>
-                                  <DialogTrigger asChild>
-                                    <Button
-                                      variant="destructive"
-                                      onClick={() =>
-                                        setSelectedTimesheet(timesheet)
-                                      }
-                                    >
-                                      <XCircle className="h-4 w-4 mr-2" />
-                                      Reject
-                                    </Button>
-                                  </DialogTrigger>
-                                  <DialogContent>
-                                    <DialogHeader>
-                                      <DialogTitle>
-                                        Reject Timesheet
-                                      </DialogTitle>
-                                      <DialogDescription>
-                                        Please provide feedback for{" "}
-                                        {timesheet.employees.name} about why
-                                        this timesheet is being rejected.
-                                      </DialogDescription>
-                                    </DialogHeader>
-                                    <div className="space-y-4">
-                                      <div>
-                                        <Label htmlFor="rejection-comment">
-                                          Feedback
-                                        </Label>
-                                        <Textarea
-                                          id="rejection-comment"
-                                          placeholder="Explain why this timesheet needs to be revised..."
-                                          value={rejectionComment}
-                                          onChange={(e) =>
-                                            setRejectionComment(e.target.value)
-                                          }
-                                        />
-                                      </div>
-                                      <div className="flex gap-2">
-                                        <Button
-                                          variant="destructive"
-                                          onClick={() =>
-                                            handleReject(timesheet.id)
-                                          }
-                                          disabled={!rejectionComment.trim()}
-                                        >
-                                          <MessageSquare className="h-4 w-4 mr-2" />
-                                          Send Rejection
-                                        </Button>
-                                      </div>
-                                    </div>
-                                  </DialogContent>
-                                </Dialog>
                               </div>
                             )}
                           </div>
@@ -508,18 +694,12 @@ const ManagerDashboard = () => {
               );
             })()}
           </div>
+        ) : activeTab === "enhanced" ? (
+          <ManagerTimesheetView />
+        ) : activeTab === "tasks" ? (
+          <TaskManagement />
         ) : (
-          activeTab === "tasks" && (
-            <div>
-              <ManagerTaskManagement />
-            </div>
-          )
-        )}
-
-        {activeTab === "leaves" && (
-          <div>
-            <ManagerLeave />
-          </div>
+          <LeaveApproval />
         )}
       </div>
     </div>
