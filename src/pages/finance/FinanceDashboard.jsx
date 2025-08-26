@@ -95,9 +95,11 @@ const FinanceDashboard = () => {
   const [selectedSummary, setSelectedSummary] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [currentEmployee, setCurrentEmployee] = useState(null);
+  const [currentEmployee, setCurrentEmployee] = useState([]);
   const [employees, setEmployees] = useState([]);
   const dispatch = useDispatch();
+  const [isAllocatingBonus, setIsAllocatingBonus] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     fetchSummaries();
@@ -127,6 +129,7 @@ const FinanceDashboard = () => {
     try {
       const response = await axiosInstance.get("api/v1/bank-details/");
       setBankDetails(response.data.bankDetails || []);
+      console.log(response.data.bankDetails);
     } catch (error) {
       console.error("Error fetching bank details:", error);
       toast.error("Failed to load bank details");
@@ -236,6 +239,8 @@ const FinanceDashboard = () => {
   }, []);
 
   const handleAddBankDetails = async () => {
+    if (isSubmitting) return; // Prevent multiple clicks
+    setIsSubmitting(true); // Disable button
     try {
       await axiosInstance.post("api/v1/bank-details/add", bankForm);
       toast.success("Bank details added successfully");
@@ -251,6 +256,8 @@ const FinanceDashboard = () => {
     } catch (error) {
       console.error("Error adding bank details:", error);
       toast.error("Failed to add bank details");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -441,6 +448,7 @@ const FinanceDashboard = () => {
         return;
       }
 
+      setIsAllocatingBonus(true); // Disable the button
       await axiosInstance.post("api/v1/bonus/allocate", bonusForm);
       toast.success("Bonus allocated successfully");
       setBonusForm({
@@ -453,6 +461,8 @@ const FinanceDashboard = () => {
     } catch (error) {
       console.error("Error allocating bonus:", error);
       toast.error("Failed to allocate bonus");
+    } finally {
+      setIsAllocatingBonus(false); // Re-enable the button after completion
     }
   };
 
@@ -625,7 +635,7 @@ const FinanceDashboard = () => {
         <Card>
           <CardContent className="p-4">
             <p className="text-sm text-muted-foreground">Total Employees</p>
-            <p className="text-xl font-semibold">{filteredSummary.length}</p>
+            <p className="text-xl font-semibold">{employees.length}</p>
             <p className="text-sm text-muted-foreground">Aug 2025</p>
           </CardContent>
         </Card>
@@ -960,9 +970,41 @@ const FinanceDashboard = () => {
                     placeholder="Enter reason for bonus allocation"
                   />
                 </div>
-                <Button className="w-full" onClick={handleAllocateBonus}>
-                  <Gift className="h-4 w-4 mr-2" />
-                  Allocate Bonus
+                <Button
+                  className="w-full"
+                  onClick={handleAllocateBonus}
+                  disabled={isAllocatingBonus}
+                >
+                  {isAllocatingBonus ? (
+                    <span className="flex items-center gap-2">
+                      <svg
+                        className="animate-spin h-4 w-4"
+                        xmlns="http://www.w3.org/2000/svg"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                      >
+                        <circle
+                          className="opacity-25"
+                          cx="12"
+                          cy="12"
+                          r="10"
+                          stroke="currentColor"
+                          strokeWidth="4"
+                        ></circle>
+                        <path
+                          className="opacity-75"
+                          fill="currentColor"
+                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                        ></path>
+                      </svg>
+                      Allocating...
+                    </span>
+                  ) : (
+                    <>
+                      <Gift className="h-4 w-4 mr-2" />
+                      Allocate Bonus
+                    </>
+                  )}
                 </Button>
               </CardContent>
             </Card>
@@ -1428,7 +1470,7 @@ const FinanceDashboard = () => {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>IFSC Code</Label>
+                  <Label>IFSC Code (Optional)</Label>
                   <Input
                     value={bankForm.ifsc_code}
                     onChange={(e) =>
@@ -1466,9 +1508,13 @@ const FinanceDashboard = () => {
                     placeholder="Enter UPI ID"
                   />
                 </div>
-                <Button onClick={handleAddBankDetails} className="w-full">
+                <Button
+                  onClick={handleAddBankDetails}
+                  className="w-full"
+                  disabled={isSubmitting} // Disable button when submitting
+                >
                   <CreditCard className="h-4 w-4 mr-2" />
-                  Add Bank Details
+                  {isSubmitting ? "Adding..." : "Add Bank Details"}
                 </Button>
               </CardContent>
             </Card>
@@ -1526,10 +1572,7 @@ const FinanceDashboard = () => {
                           <TableCell>
                             <div>
                               <div className="font-medium">
-                                {bank.employee_name}
-                              </div>
-                              <div className="text-sm text-muted-foreground">
-                                {bank.employee_id}
+                                {bank.account_holder_name}
                               </div>
                             </div>
                           </TableCell>
@@ -1551,7 +1594,7 @@ const FinanceDashboard = () => {
                               )}
                             </div>
                           </TableCell>
-                          <TableCell>
+                          <TableCell className="flex items-center gap-2 lg:flex-row flex-col">
                             <Button
                               size="sm"
                               variant="outline"
@@ -1617,7 +1660,7 @@ const FinanceDashboard = () => {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label>IFSC Code</Label>
+                    <Label>IFSC Code (Optional)</Label>
                     <Input
                       value={editingBankDetails.ifsc_code}
                       onChange={(e) =>

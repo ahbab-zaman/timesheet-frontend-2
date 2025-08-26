@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { differenceInDays } from "date-fns";
+import { differenceInDays, format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -26,32 +26,41 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import axiosInstance from "../../services/axiosInstance"; // Adjust the import path based on your project structure
+import axiosInstance from "../../services/axiosInstance";
 
 const ManagerLeave = () => {
   const [filter, setFilter] = useState("pending");
   const [leaveRequests, setLeaveRequests] = useState([]);
+  const [loading, setLoading] = useState(false);
 
   // Fetch leave requests on component mount
   useEffect(() => {
     const fetchLeaveRequests = async () => {
+      setLoading(true);
       try {
         const response = await axiosInstance.get("/api/v1/leave", {
-          params: { page: 1, limit: 100 }, // Adjust limit as needed
+          params: { page: 1, limit: 100 },
         });
-        console.log("Leave requests response:", response.data); // Debug response
-        // Ensure response.data.leaves is an array
         const leaves = Array.isArray(response.data.leaves)
           ? response.data.leaves
           : [];
         const mappedRequests = leaves.map((leave) => ({
           id: leave.id,
           name: leave.employeeName,
-          email: leave.employeeEmail, // Placeholder; update if Employee join is implemented
-          dept: leave.employeeDepartment, // Placeholder; update if Employee join is implemented
+          email: leave.employeeEmail,
+          dept: leave.employeeDepartment,
           type: leave.leaveType,
+          fromDate: leave.fromDate,
+          toDate: leave.toDate,
           days:
             differenceInDays(new Date(leave.toDate), new Date(leave.fromDate)) +
             1,
@@ -61,6 +70,8 @@ const ManagerLeave = () => {
       } catch (error) {
         toast.error("Failed to fetch leave requests. Please try again.");
         console.error("Error fetching leave requests:", error);
+      } finally {
+        setLoading(false);
       }
     };
     fetchLeaveRequests();
@@ -97,93 +108,119 @@ const ManagerLeave = () => {
     }
   };
 
+  const getInitials = (name) => {
+    return name
+      .split(" ")
+      .map((word) => word[0])
+      .join("")
+      .toUpperCase()
+      .slice(0, 2);
+  };
+
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
+    <div className="space-y-6 p-4 md:p-6 bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 min-h-screen">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h2 className="text-2xl font-bold">Leave Approvals</h2>
-          <p className="text-muted-foreground">
-            Review and approve employee leave requests
+          <h2 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white">
+            Leave Approvals
+          </h2>
+          <p className="text-muted-foreground mt-1">
+            Manage and review employee leave requests with ease
           </p>
         </div>
-      </div>
-
-      <div className="mb-6">
-        <div className="flex gap-2">
-          <Button
-            variant={filter === "pending" ? "default" : "outline"}
-            onClick={() => setFilter("pending")}
-            size="sm"
-          >
+        <Select value={filter} onValueChange={setFilter}>
+          <SelectTrigger className="w-[180px] bg-white dark:bg-gray-800 shadow-sm">
             <Filter className="h-4 w-4 mr-2" />
-            Pending (
-            {leaveRequests.filter((r) => r.status === "pending").length})
-          </Button>
-          <Button
-            variant={filter === "approved" ? "default" : "outline"}
-            onClick={() => setFilter("approved")}
-            size="sm"
-          >
-            Approved
-          </Button>
-          <Button
-            variant={filter === "rejected" ? "default" : "outline"}
-            onClick={() => setFilter("rejected")}
-            size="sm"
-          >
-            Rejected
-          </Button>
-          <Button
-            variant={filter === "all" ? "default" : "outline"}
-            onClick={() => setFilter("all")}
-            size="sm"
-          >
-            All
-          </Button>
-        </div>
+            <SelectValue placeholder="Filter requests" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="pending">
+              Pending (
+              {leaveRequests.filter((r) => r.status === "pending").length})
+            </SelectItem>
+            <SelectItem value="approved">Approved</SelectItem>
+            <SelectItem value="rejected">Rejected</SelectItem>
+            <SelectItem value="all">All</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
-      <div className="grid gap-4">
-        {filteredRequests.length === 0 ? (
-          <Card>
-            <CardContent className="text-center py-8">
-              <Calendar className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-              <h3 className="text-lg font-medium mb-2">
-                No leave requests found
-              </h3>
-              <p className="text-muted-foreground">
-                No {filter} leave requests to review.
-              </p>
-            </CardContent>
-          </Card>
-        ) : (
-          filteredRequests.map((req) => (
-            <Card key={req.id}>
-              <CardHeader>
+      {loading ? (
+        <Card className="border-none shadow-lg">
+          <CardContent className="flex justify-center items-center py-12">
+            <svg
+              className="animate-spin h-8 w-8 text-primary"
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+            >
+              <circle
+                className="opacity-25"
+                cx="12"
+                cy="12"
+                r="10"
+                stroke="currentColor"
+                strokeWidth="4"
+              ></circle>
+              <path
+                className="opacity-75"
+                fill="currentColor"
+                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+              ></path>
+            </svg>
+          </CardContent>
+        </Card>
+      ) : filteredRequests.length === 0 ? (
+        <Card className="border-none shadow-lg bg-white dark:bg-gray-800">
+          <CardContent className="text-center py-12">
+            <Calendar className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
+            <h3 className="text-xl font-semibold mb-2 text-gray-900 dark:text-white">
+              No Leave Requests Found
+            </h3>
+            <p className="text-muted-foreground">
+              No {filter} leave requests to review at this time.
+            </p>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+          {filteredRequests.map((req) => (
+            <Card
+              key={req.id}
+              className="border-none shadow-lg hover:shadow-xl transition-shadow duration-300 bg-white dark:bg-gray-800"
+            >
+              <CardHeader className="pb-2">
                 <div className="flex justify-between items-start">
-                  <div>
-                    <CardTitle className="flex items-center gap-3">
-                      <User className="h-5 w-5" />
-                      {req.name}
-                      <Badge
-                        variant={
-                          req.status === "pending"
-                            ? "secondary"
-                            : req.status === "approved"
-                            ? "default"
-                            : "destructive"
-                        }
-                      >
-                        {req.status.charAt(0).toUpperCase() +
-                          req.status.slice(1)}
-                      </Badge>
-                    </CardTitle>
-                    <CardDescription>
-                      {req.email} • {req.dept}
-                    </CardDescription>
+                  <div className="flex items-center gap-3">
+                    <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-semibold">
+                      {getInitials(req.name)}
+                    </div>
+                    <div>
+                      <CardTitle className="flex items-center gap-2 text-lg">
+                        {req.name}
+                        <Badge
+                          variant={
+                            req.status === "pending"
+                              ? "secondary"
+                              : req.status === "approved"
+                              ? "default"
+                              : "destructive"
+                          }
+                          className="text-xs"
+                        >
+                          {req.status.charAt(0).toUpperCase() +
+                            req.status.slice(1)}
+                        </Badge>
+                      </CardTitle>
+                      <CardDescription className="text-sm">
+                        {req.email} • {req.dept}
+                      </CardDescription>
+                    </div>
                   </div>
                   <div className="text-right">
-                    <div className="text-lg font-bold">{req.type}</div>
+                    <div className="text-md font-semibold text-gray-900 dark:text-white">
+                      {req.type}
+                    </div>
                     <div className="text-xs text-muted-foreground">
                       {req.days} days
                     </div>
@@ -192,38 +229,60 @@ const ManagerLeave = () => {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  <div className="flex gap-2 pt-4">
-                    <Button onClick={() => approveLeave(req.id)}>
+                  <div className="text-sm text-muted-foreground">
+                    <span className="font-medium">From:</span>{" "}
+                    {format(new Date(req.fromDate), "MMM dd, yyyy")}
+                    <br />
+                    <span className="font-medium">To:</span>{" "}
+                    {format(new Date(req.toDate), "MMM dd, yyyy")}
+                  </div>
+                  <div className="flex gap-2 pt-2">
+                    <Button
+                      onClick={() => approveLeave(req.id)}
+                      className="flex-1 bg-green-600 hover:bg-green-700"
+                    >
                       <CheckCircle className="h-4 w-4 mr-2" />
                       Approve
                     </Button>
                     <Dialog>
                       <DialogTrigger asChild>
-                        <Button variant="destructive">
+                        <Button
+                          variant="destructive"
+                          className="flex-1 bg-red-600 hover:bg-red-700"
+                        >
                           <XCircle className="h-4 w-4 mr-2" />
                           Reject
                         </Button>
                       </DialogTrigger>
-                      <DialogContent>
+                      <DialogContent className="sm:max-w-md bg-white dark:bg-gray-800">
                         <DialogHeader>
-                          <DialogTitle>Reject Leave Request</DialogTitle>
+                          <DialogTitle className="text-xl">
+                            Reject Leave Request
+                          </DialogTitle>
                           <DialogDescription>
                             Confirm rejection of {req.name}'s leave request.
-                            This action will remove the request.
+                            Provide remarks to explain the decision.
                           </DialogDescription>
                         </DialogHeader>
                         <div className="space-y-4">
                           <div>
-                            <Label htmlFor="rejection-remarks">Remarks</Label>
+                            <Label
+                              htmlFor="rejection-remarks"
+                              className="text-sm font-medium"
+                            >
+                              Remarks
+                            </Label>
                             <Textarea
                               id="rejection-remarks"
                               placeholder="Explain why this leave request is being rejected..."
+                              className="mt-1"
                             />
                           </div>
                           <div className="flex gap-2">
                             <Button
                               variant="destructive"
                               onClick={() => rejectLeave(req.id)}
+                              className="flex-1"
                             >
                               <MessageSquare className="h-4 w-4 mr-2" />
                               Send Rejection
@@ -236,9 +295,9 @@ const ManagerLeave = () => {
                 </div>
               </CardContent>
             </Card>
-          ))
-        )}
-      </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 };
