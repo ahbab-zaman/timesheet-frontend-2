@@ -1,6 +1,4 @@
 import axios from "axios";
-
-// Fallback URL for cases where VITE_API_BASE_URL is undefined
 const FALLBACK_API_BASE_URL =
   process.env.NODE_ENV === "production"
     ? "https://timeserver.airepro.in"

@@ -702,8 +702,8 @@ const TaskManagement = () => {
                           key={activity.id}
                           className="hover:bg-muted/50"
                         >
-                          <TableCell>
-                            {getStatusDisplay(activity.status)}
+                          <TableCell className="badge">
+                            <Badge>{getStatusDisplay(activity.status)}</Badge>
                           </TableCell>
                           <TableCell className="font-medium">
                             {activity.project}
