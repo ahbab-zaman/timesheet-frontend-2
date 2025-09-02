@@ -444,15 +444,7 @@ const TaskManagement = () => {
                             {errors.project}
                           </p>
                         )}
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setShowNewProject(true)}
-                          className="w-full"
-                        >
-                          Create New Project
-                        </Button>
+                       
                       </div>
                     ) : (
                       <div className="space-y-2">
@@ -798,9 +790,6 @@ const TaskManagement = () => {
                             }{" "}
                             tasks
                           </span>
-                          <Button variant="outline" size="sm">
-                            View Tasks
-                          </Button>
                         </div>
                       </CardContent>
                     </Card>

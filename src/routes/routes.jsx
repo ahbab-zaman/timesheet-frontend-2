@@ -9,6 +9,7 @@ import FinanceDashboard from "@/pages/finance/FinanceDashboard";
 import ProtectedRoute from "@/components/layout/ProtectedRoute";
 import PublicRoute from "../utils/RedirectToDashboard";
 import RedirectToDashboard from "../utils/RedirectToDashboard";
+import EmployeeMain from "@/pages/employee/EmployeeMain";
 
 const router = createBrowserRouter([
   // Root → redirect based on role if logged in
@@ -57,9 +58,12 @@ const router = createBrowserRouter([
         <App />
       </ProtectedRoute>
     ),
-    children: [{ path: "dashboard", element: <EmployeeDashboard /> }],
+    children: [{ path: "dashboard", element: <EmployeeMain /> }],
   },
-
+  {
+    path: "/employee/timesheet",
+    element: <EmployeeDashboard />,
+  },
   // Finance Routes
   {
     path: "/finance",
