@@ -1,15 +1,530 @@
-import React, { useState, useEffect } from "react";
+// import React, { useState, useEffect } from "react";
+// import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+// import { Button } from "@/components/ui/button";
+// import { Badge } from "@/components/ui/badge";
+// import { Textarea } from "@/components/ui/textarea";
+// import {
+//   Dialog,
+//   DialogContent,
+//   DialogHeader,
+//   DialogTitle,
+//   DialogTrigger,
+// } from "@/components/ui/dialog";
+// import { Input } from "@/components/ui/input";
+// import { toast } from "@/hooks/use-toast";
+// import {
+//   CheckCircle,
+//   XCircle,
+//   Clock,
+//   User,
+//   Calendar,
+//   Lock,
+// } from "lucide-react";
+// import { format, startOfWeek, endOfWeek } from "date-fns";
+// import axiosInstance from "../services/axiosInstance";
+
+// const TimesheetApproval = ({ userRole }) => {
+//   const [timesheets, setTimesheets] = useState([]);
+//   const [loading, setLoading] = useState(true);
+//   const [filter, setFilter] = useState("pending");
+//   const [selectedTimesheet, setSelectedTimesheet] = useState(null);
+//   const [rejectionComment, setRejectionComment] = useState("");
+//   const [searchTerm, setSearchTerm] = useState("");
+//   const [dateRange, setDateRange] = useState(() => {
+//     const today = new Date();
+//     return {
+//       start: startOfWeek(today, { weekStartsOn: 1 }), // Monday
+//       end: endOfWeek(today, { weekStartsOn: 1 }), // Sunday
+//     };
+//   });
+//   const [user, setUser] = useState(null);
+//   const [employees, setEmployees] = useState([]);
+
+//   useEffect(() => {
+//     let isMounted = true;
+
+//     const fetchCurrentUser = async () => {
+//       try {
+//         const response = await axiosInstance.get("/api/v1/employee");
+//         const user = response.data.employees[0];
+//         if (isMounted) {
+//           setUser(user.id);
+//         }
+//       } catch (error) {
+//         if (isMounted) {
+//           toast({
+//             title: "Failed to fetch user data",
+//             description: error.response?.data?.error || "Please try again.",
+//             variant: "destructive",
+//           });
+//           console.error("Error fetching user data:", error);
+//         }
+//       }
+//     };
+
+//     const fetchEmployees = async () => {
+//       try {
+//         const response = await axiosInstance.get("/api/v1/employee");
+//         if (isMounted) {
+//           setEmployees(response.data.employees || []);
+//         }
+//       } catch (error) {
+//         if (isMounted) {
+//           toast({
+//             title: "Failed to fetch employees",
+//             description: error.response?.data?.error || "Please try again.",
+//             variant: "destructive",
+//           });
+//           console.error("Error fetching employees:", error);
+//         }
+//       }
+//     };
+
+//     const fetchTimesheets = async () => {
+//       setLoading(true);
+//       try {
+//         const response = await axiosInstance.get(
+//           "/api/v1/time/timesheets/all",
+//           {
+//             params: {
+//               week_start: format(dateRange.start, "yyyy-MM-dd"),
+//               week_end: format(dateRange.end, "yyyy-MM-dd"),
+//               status: filter === "all" ? undefined : filter,
+//             },
+//           }
+//         );
+//         console.log("API Response:", response.data); // Log raw response
+
+//         let allTimesheets = [];
+//         if (Array.isArray(response.data)) {
+//           allTimesheets = response.data.map((timesheet) => ({
+//             id: timesheet.id || "unknown",
+//             employee: {
+//               id: timesheet.employee?.id || timesheet.employee_id || "unknown",
+//               name: timesheet.employee?.name || "Unknown Employee",
+//               email: timesheet.employee?.email || "unknown@example.com",
+//             },
+//             week_start_date:
+//               timesheet.week_start_date ||
+//               format(dateRange.start, "yyyy-MM-dd"),
+//             week_end_date:
+//               timesheet.week_end_date || format(dateRange.end, "yyyy-MM-dd"),
+//             total_hours: timesheet.total_hours || 0,
+//             status: timesheet.status || "draft",
+//             approved_at: timesheet.approved_at || null,
+//             locked_at: timesheet.locked_at || null,
+//             comments: timesheet.comments || "",
+//             entries: timesheet.entries || [],
+//           }));
+//         } else if (response.data.timesheets) {
+//           allTimesheets = response.data.timesheets.map((timesheet) => ({
+//             id: timesheet.id || "unknown",
+//             employee: {
+//               id: timesheet.employee?.id || timesheet.employee_id || "unknown",
+//               name: timesheet.employee?.name || "Unknown Employee",
+//               email: timesheet.employee?.email || "unknown@example.com",
+//             },
+//             week_start_date:
+//               timesheet.week_start_date ||
+//               format(dateRange.start, "yyyy-MM-dd"),
+//             week_end_date:
+//               timesheet.week_end_date || format(dateRange.end, "yyyy-MM-dd"),
+//             total_hours: timesheet.total_hours || 0,
+//             status: timesheet.status || "draft",
+//             approved_at: timesheet.approved_at || null,
+//             locked_at: timesheet.locked_at || null,
+//             comments: timesheet.comments || "",
+//             entries: timesheet.entries || [],
+//           }));
+//         } else {
+//           console.warn("Unexpected response format:", response.data);
+//           toast({
+//             title: "Unexpected Response",
+//             description: "The server returned an unexpected data format.",
+//             variant: "destructive",
+//           });
+//         }
+
+//         console.log("Mapped Timesheets:", allTimesheets); // Log mapped data
+//         if (isMounted) {
+//           setTimesheets(allTimesheets);
+//           if (allTimesheets.length === 0) {
+//             toast({
+//               title: "No Timesheets",
+//               description: `No timesheets found for week of ${format(
+//                 dateRange.start,
+//                 "MMM dd, yyyy"
+//               )}.`,
+//               variant: "info",
+//             });
+//           }
+//         }
+//       } catch (error) {
+//         if (isMounted) {
+//           console.error("Error fetching timesheets:", error);
+//           toast({
+//             title: "Failed to fetch timesheets",
+//             description: error.response?.data?.error || "Please try again.",
+//             variant: "destructive",
+//           });
+//         }
+//       } finally {
+//         if (isMounted) {
+//           setLoading(false);
+//         }
+//       }
+//     };
+
+//     const initializeData = async () => {
+//       await fetchCurrentUser();
+//       await fetchEmployees();
+//       await fetchTimesheets();
+//     };
+
+//     initializeData();
+
+//     return () => {
+//       isMounted = false;
+//     };
+//   }, [filter, dateRange]);
+
+//   const handleApprove = async (timesheetId) => {
+//     try {
+//       await axiosInstance.patch(
+//         `/api/v1/time/timesheets/${timesheetId}/approve`
+//       );
+//       setTimesheets((prev) =>
+//         prev.map((t) =>
+//           t.id === timesheetId
+//             ? {
+//                 ...t,
+//                 status: "approved",
+//                 approved_at: new Date().toISOString(),
+//               }
+//             : t
+//         )
+//       );
+//       toast({
+//         title: "Timesheet approved",
+//         description: "Timesheet has been approved successfully",
+//       });
+//     } catch (error) {
+//       console.error("Error approving timesheet:", error);
+//       toast({
+//         title: "Error approving timesheet",
+//         description: error.response?.data?.error || error.message,
+//         variant: "destructive",
+//       });
+//     }
+//   };
+
+//   const handleReject = async (timesheetId) => {
+//     try {
+//       await axiosInstance.patch(
+//         `/api/v1/time/timesheets/${timesheetId}/reject`,
+//         {
+//           remarks: rejectionComment,
+//         }
+//       );
+//       setTimesheets((prev) =>
+//         prev.map((t) =>
+//           t.id === timesheetId
+//             ? { ...t, status: "rejected", comments: rejectionComment }
+//             : t
+//         )
+//       );
+//       toast({
+//         title: "Timesheet rejected",
+//         description: "Timesheet has been rejected successfully",
+//       });
+//       setRejectionComment("");
+//       setSelectedTimesheet(null);
+//     } catch (error) {
+//       console.error("Error rejecting timesheet:", error);
+//       toast({
+//         title: "Error rejecting timesheet",
+//         description: error.response?.data?.error || error.message,
+//         variant: "destructive",
+//       });
+//     }
+//   };
+
+//   const getStatusBadge = (status, isLocked) => {
+//     if (isLocked) {
+//       return (
+//         <Badge variant="outline" className="bg-gray-100">
+//           <Lock className="h-3 w-3 mr-1" />
+//           Locked
+//         </Badge>
+//       );
+//     }
+
+//     const variants = {
+//       pending: { variant: "secondary", label: "🟡 Pending", icon: Clock },
+//       approved: { variant: "default", label: "✅ Approved", icon: CheckCircle },
+//       rejected: { variant: "destructive", label: "🔴 Rejected", icon: XCircle },
+//       draft: { variant: "outline", label: "Draft", icon: Clock },
+//     };
+
+//     const config = variants[status] || variants.draft;
+//     const IconComponent = config.icon;
+
+//     return (
+//       <Badge variant={config.variant}>
+//         <IconComponent className="h-3 w-3 mr-1" />
+//         {config.label}
+//       </Badge>
+//     );
+//   };
+
+//   const filteredTimesheets = timesheets.filter(
+//     (timesheet) =>
+//       timesheet.employee.name
+//         .toLowerCase()
+//         .includes(searchTerm.toLowerCase()) ||
+//       timesheet.employee.email.toLowerCase().includes(searchTerm.toLowerCase())
+//   );
+
+//   const handleDateRangeChange = (direction) => {
+//     setDateRange((prev) => {
+//       const newStart = new Date(prev.start);
+//       newStart.setDate(prev.start.getDate() + direction * 7);
+//       return {
+//         start: startOfWeek(newStart, { weekStartsOn: 1 }),
+//         end: endOfWeek(newStart, { weekStartsOn: 1 }),
+//       };
+//     });
+//   };
+
+//   return (
+//     <div className="space-y-6">
+//       {/* Header Controls */}
+//       <div className="flex flex-wrap gap-4 items-center justify-between">
+//         <div className="flex gap-2">
+//           <Button
+//             variant={filter === "pending" ? "default" : "outline"}
+//             onClick={() => setFilter("pending")}
+//             size="sm"
+//           >
+//             Pending ({timesheets.filter((t) => t.status === "pending").length})
+//           </Button>
+//           <Button
+//             variant={filter === "approved" ? "default" : "outline"}
+//             onClick={() => setFilter("approved")}
+//             size="sm"
+//           >
+//             Approved
+//           </Button>
+//           <Button
+//             variant={filter === "rejected" ? "default" : "outline"}
+//             onClick={() => setFilter("rejected")}
+//             size="sm"
+//           >
+//             Rejected
+//           </Button>
+//           <Button
+//             variant={filter === "all" ? "default" : "outline"}
+//             onClick={() => setFilter("all")}
+//             size="sm"
+//           >
+//             All
+//           </Button>
+//         </div>
+//         <div className="flex gap-2 items-center">
+//           <Button
+//             variant="outline"
+//             size="sm"
+//             onClick={() => handleDateRangeChange(-1)}
+//           >
+//             Previous Week
+//           </Button>
+//           <span className="text-sm">
+//             {format(dateRange.start, "MMM dd, yyyy")} -{" "}
+//             {format(dateRange.end, "MMM dd, yyyy")}
+//           </span>
+//           <Button
+//             variant="outline"
+//             size="sm"
+//             onClick={() => handleDateRangeChange(1)}
+//           >
+//             Next Week
+//           </Button>
+//           <Input
+//             placeholder="Search employee..."
+//             value={searchTerm}
+//             onChange={(e) => setSearchTerm(e.target.value)}
+//             className="w-48"
+//           />
+//         </div>
+//       </div>
+
+//       {/* Timesheets List */}
+//       <div className="space-y-4">
+//         {loading ? (
+//           <Card>
+//             <CardContent className="p-8 text-center">
+//               <Clock className="h-8 w-8 animate-spin mx-auto mb-4" />
+//               <p>Loading timesheets...</p>
+//             </CardContent>
+//           </Card>
+//         ) : filteredTimesheets.length === 0 ? (
+//           <Card>
+//             <CardContent className="p-8 text-center">
+//               <Calendar className="h-8 w-8 mx-auto mb-4 text-muted-foreground" />
+//               <p className="text-muted-foreground">
+//                 No timesheets found for the selected week and filter.
+//               </p>
+//             </CardContent>
+//           </Card>
+//         ) : (
+//           filteredTimesheets.map((timesheet) => (
+//             <Card key={timesheet.id} className="relative">
+//               <CardHeader>
+//                 <div className="flex items-center justify-between">
+//                   <div className="flex items-center gap-3">
+//                     <div>
+//                       <CardTitle className="text-lg flex items-center gap-2">
+//                         <User className="h-5 w-5" />
+//                         {timesheet.employee.name}
+//                       </CardTitle>
+//                       <p className="text-sm text-muted-foreground">
+//                         {timesheet.employee.email} • Week of{" "}
+//                         {format(
+//                           new Date(timesheet.week_start_date),
+//                           "MMM dd, yyyy"
+//                         )}
+//                       </p>
+//                     </div>
+//                   </div>
+//                   <div className="flex items-center gap-2">
+//                     {getStatusBadge(timesheet.status, !!timesheet.locked_at)}
+//                     <Badge variant="outline">
+//                       {timesheet.total_hours}h total
+//                     </Badge>
+//                   </div>
+//                 </div>
+//               </CardHeader>
+//               <CardContent>
+//                 <div className="space-y-4">
+//                   {/* Time Entries */}
+//                   <div className="space-y-2">
+//                     <h4 className="font-medium">Time Entries</h4>
+//                     {timesheet.entries.length === 0 ? (
+//                       <p className="text-sm text-muted-foreground">
+//                         No time entries for this timesheet.
+//                       </p>
+//                     ) : (
+//                       timesheet.entries.map((entry) => (
+//                         <div
+//                           key={entry.id}
+//                           className="flex items-center justify-between p-2 bg-muted rounded"
+//                         >
+//                           <div>
+//                             <span className="font-medium">
+//                               {format(new Date(entry.date), "MMM dd")}
+//                             </span>
+//                             <span className="mx-2">•</span>
+//                             <span>{entry.hours}h</span>
+//                             {entry.description && (
+//                               <>
+//                                 <span className="mx-2">•</span>
+//                                 <span className="text-muted-foreground">
+//                                   {entry.description}
+//                                 </span>
+//                               </>
+//                             )}
+//                             {entry.task && (
+//                               <>
+//                                 <span className="mx-2">•</span>
+//                                 <span className="text-muted-foreground">
+//                                   Task: {entry.task.name} (Project:{" "}
+//                                   {entry.task.project?.name || "Unknown"})
+//                                 </span>
+//                               </>
+//                             )}
+//                           </div>
+//                         </div>
+//                       ))
+//                     )}
+//                   </div>
+
+//                   {/* Action Buttons */}
+//                   {timesheet.status === "pending" && userRole === "admin" && (
+//                     <div className="flex gap-2 pt-4 border-t">
+//                       <Button
+//                         onClick={() => handleApprove(timesheet.id)}
+//                         size="sm"
+//                       >
+//                         <CheckCircle className="h-4 w-4 mr-2" />
+//                         Approve
+//                       </Button>
+//                       <Dialog
+//                         open={selectedTimesheet === timesheet.id}
+//                         onOpenChange={(open) => {
+//                           setSelectedTimesheet(open ? timesheet.id : null);
+//                         }}
+//                       >
+//                         <DialogTrigger asChild>
+//                           <Button variant="outline" size="sm">
+//                             <XCircle className="h-4 w-4 mr-2" />
+//                             Reject
+//                           </Button>
+//                         </DialogTrigger>
+//                         <DialogContent>
+//                           <DialogHeader>
+//                             <DialogTitle>Reject Timesheet</DialogTitle>
+//                           </DialogHeader>
+//                           <Textarea
+//                             placeholder="Reason for rejection..."
+//                             value={rejectionComment}
+//                             onChange={(e) =>
+//                               setRejectionComment(e.target.value)
+//                             }
+//                           />
+//                           <div className="flex gap-2 pt-4">
+//                             <Button
+//                               variant="outline"
+//                               onClick={() => setSelectedTimesheet(null)}
+//                             >
+//                               Cancel
+//                             </Button>
+//                             <Button
+//                               variant="destructive"
+//                               onClick={() => handleReject(timesheet.id)}
+//                               disabled={!rejectionComment.trim()}
+//                             >
+//                               Reject
+//                             </Button>
+//                           </div>
+//                         </DialogContent>
+//                       </Dialog>
+//                     </div>
+//                   )}
+//                   {timesheet.status === "rejected" && timesheet.comments && (
+//                     <div className="pt-4">
+//                       <h4 className="font-medium">Rejection Reason</h4>
+//                       <p className="text-sm text-muted-foreground">
+//                         {timesheet.comments}
+//                       </p>
+//                     </div>
+//                   )}
+//                 </div>
+//               </CardContent>
+//             </Card>
+//           ))
+//         )}
+//       </div>
+//     </div>
+//   );
+// };
+
+// export default TimesheetApproval;
+
+import React, { useState, useEffect, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   Dialog,
   DialogContent,
@@ -18,7 +533,6 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { toast } from "@/hooks/use-toast";
 import {
   CheckCircle,
@@ -26,265 +540,234 @@ import {
   Clock,
   User,
   Calendar,
-  Edit3,
   Lock,
-  Download,
-  AlertTriangle,
-  Copy,
 } from "lucide-react";
 import { format } from "date-fns";
+import axiosInstance from "../services/axiosInstance";
 
 const TimesheetApproval = ({ userRole }) => {
   const [timesheets, setTimesheets] = useState([]);
-  const [approvalRules, setApprovalRules] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState("submitted");
+  const [filter, setFilter] = useState("pending");
   const [selectedTimesheet, setSelectedTimesheet] = useState(null);
-  const [editingEntry, setEditingEntry] = useState(null);
-  const [bulkAction, setBulkAction] = useState("");
-  const [selectedTimesheets, setSelectedTimesheets] = useState([]);
+  const [rejectionComment, setRejectionComment] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
-  const [showDuplicates, setShowDuplicates] = useState(false);
-  const [duplicateTimesheets, setDuplicateTimesheets] = useState([]);
+  const [user, setUser] = useState(null);
+  const [employees, setEmployees] = useState([]);
 
   useEffect(() => {
-    fetchTimesheets();
-    fetchApprovalRules();
-    if (showDuplicates) {
-      detectDuplicates();
-    }
-  }, [filter, showDuplicates]);
+    let isMounted = true;
 
-  const fetchTimesheets = async () => {
-    setLoading(true);
-    try {
-      // Mock data
-      const mockTimesheets = [
-        {
-          id: "1",
-          employee_id: "EMP001",
-          status: "submitted",
-          total_hours: 35,
-          week_start_date: "2025-08-04",
-          week_end_date: "2025-08-10",
-          submitted_at: "2025-08-11T10:00:00Z",
-          employees: { name: "John Doe", email: "john@example.com" },
-          time_entries: [
-            {
-              id: "1",
-              date: "2025-08-04",
-              hours: 8,
-              description: "Development task",
+    const fetchCurrentUser = async () => {
+      try {
+        const response = await axiosInstance.get("/api/v1/employee");
+        const user = response.data.employees[0];
+        if (isMounted) {
+          setUser(user.id);
+        }
+      } catch (error) {
+        if (isMounted) {
+          const errorMessage =
+            error.code === "ECONNABORTED"
+              ? "Request to fetch user data timed out. Please check if the server is running at http://localhost:3000."
+              : error.response?.data?.error || "Failed to fetch user data.";
+          toast({
+            title: "Error fetching user data",
+            description: errorMessage,
+            variant: "destructive",
+          });
+          console.error("Error fetching user data:", error);
+        }
+      }
+    };
+
+    const fetchEmployees = async () => {
+      try {
+        const response = await axiosInstance.get("/api/v1/employee");
+        if (isMounted) {
+          setEmployees(response.data.employees || []);
+        }
+      } catch (error) {
+        if (isMounted) {
+          const errorMessage =
+            error.code === "ECONNABORTED"
+              ? "Request to fetch employees timed out. Please check if the server is running at http://localhost:3000."
+              : error.response?.data?.error || "Failed to fetch employees.";
+          toast({
+            title: "Error fetching employees",
+            description: errorMessage,
+            variant: "destructive",
+          });
+          console.error("Error fetching employees:", error);
+        }
+      }
+    };
+
+    const fetchTimesheets = async () => {
+      setLoading(true);
+      try {
+        const response = await axiosInstance.get(
+          "/api/v1/time/timesheets/all",
+          {
+            params: {
+              status: filter === "all" ? undefined : filter,
             },
-            { id: "2", date: "2025-08-05", hours: 7, description: "Meeting" },
-            {
-              id: "3",
-              date: "2025-08-06",
-              hours: 6,
-              description: "Bug fixing",
+          }
+        );
+        console.log("API Response:", response.data); // Log raw response
+
+        let allTimesheets = [];
+        if (Array.isArray(response.data)) {
+          allTimesheets = response.data.map((timesheet) => ({
+            id: timesheet.id || "unknown",
+            employee: {
+              id: timesheet.employee?.id || timesheet.employee_id || "unknown",
+              name: timesheet.employee?.name || "Unknown Employee",
+              email: timesheet.employee?.email || "unknown@example.com",
             },
-          ],
-        },
-        {
-          id: "2",
-          employee_id: "EMP002",
-          status: "approved",
-          total_hours: 40,
-          week_start_date: "2025-08-04",
-          week_end_date: "2025-08-10",
-          submitted_at: "2025-08-11T11:00:00Z",
-          approved_at: "2025-08-12T09:00:00Z",
-          approved_by: "Manager1",
-          employees: { name: "Jane Smith", email: "jane@example.com" },
-          time_entries: [
-            { id: "4", date: "2025-08-04", hours: 9, description: "Design" },
-            { id: "5", date: "2025-08-05", hours: 8, description: "Review" },
-          ],
-        },
-        {
-          id: "3",
-          employee_id: "EMP001",
-          status: "rejected",
-          total_hours: 45,
-          week_start_date: "2025-08-04",
-          week_end_date: "2025-08-10",
-          submitted_at: "2025-08-11T12:00:00Z",
-          comments: "Exceeded hours limit",
-          employees: { name: "John Doe", email: "john@example.com" },
-          time_entries: [
-            { id: "6", date: "2025-08-04", hours: 10, description: "Testing" },
-            {
-              id: "7",
-              date: "2025-08-05",
-              hours: 9,
-              description: "Documentation",
+            week_start_date: timesheet.week_start_date || "unknown",
+            week_end_date: timesheet.week_end_date || "unknown",
+            total_hours: timesheet.total_hours || 0,
+            status: timesheet.status || "draft",
+            approved_at: timesheet.approved_at || null,
+            locked_at: timesheet.locked_at || null,
+            comments: timesheet.comments || "",
+            entries: timesheet.entries || [],
+          }));
+        } else if (response.data.timesheets) {
+          allTimesheets = response.data.timesheets.map((timesheet) => ({
+            id: timesheet.id || "unknown",
+            employee: {
+              id: timesheet.employee?.id || timesheet.employee_id || "unknown",
+              name: timesheet.employee?.name || "Unknown Employee",
+              email: timesheet.employee?.email || "unknown@example.com",
             },
-          ],
-        },
-      ];
-      setTimesheets(mockTimesheets);
-    } catch (error) {
+            week_start_date: timesheet.week_start_date || "unknown",
+            week_end_date: timesheet.week_end_date || "unknown",
+            total_hours: timesheet.total_hours || 0,
+            status: timesheet.status || "draft",
+            approved_at: timesheet.approved_at || null,
+            locked_at: timesheet.locked_at || null,
+            comments: timesheet.comments || "",
+            entries: timesheet.entries || [],
+          }));
+        } else {
+          console.warn("Unexpected response format:", response.data);
+          toast({
+            title: "Unexpected Response",
+            description: "The server returned an unexpected data format.",
+            variant: "destructive",
+          });
+        }
+
+        console.log("Mapped Timesheets:", allTimesheets); // Log mapped data
+        if (isMounted) {
+          setTimesheets(allTimesheets);
+          if (allTimesheets.length === 0) {
+            toast({
+              title: "No Timesheets",
+              description: "No timesheets found for the selected filter.",
+              variant: "info",
+            });
+          }
+        }
+      } catch (error) {
+        if (isMounted) {
+          const errorMessage =
+            error.code === "ECONNABORTED"
+              ? "Request to fetch timesheets timed out. Please check if the server is running at http://localhost:3000."
+              : error.response?.data?.error || "Failed to fetch timesheets.";
+          toast({
+            title: "Error fetching timesheets",
+            description: errorMessage,
+            variant: "destructive",
+          });
+          console.error("Error fetching timesheets:", error);
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    const initializeData = async () => {
+      try {
+        await fetchCurrentUser();
+      } catch (error) {
+        console.warn("fetchCurrentUser failed, continuing with other fetches");
+      }
+      try {
+        await fetchEmployees();
+      } catch (error) {
+        console.warn("fetchEmployees failed, continuing with timesheets");
+      }
+      await fetchTimesheets();
+    };
+
+    initializeData();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [filter]);
+
+  const handleApprove = async (timesheetId) => {
+    try {
+      await axiosInstance.patch(
+        `/api/v1/time/timesheets/${timesheetId}/approve`
+      );
+      setTimesheets((prev) =>
+        prev.map((t) =>
+          t.id === timesheetId
+            ? {
+                ...t,
+                status: "approved",
+                approved_at: new Date().toISOString(),
+              }
+            : t
+        )
+      );
       toast({
-        title: "Error fetching timesheets",
-        description: error.message,
+        title: "Timesheet approved",
+        description: "Timesheet has been approved successfully",
+      });
+    } catch (error) {
+      console.error("Error approving timesheet:", error);
+      toast({
+        title: "Error approving timesheet",
+        description: error.response?.data?.error || error.message,
         variant: "destructive",
       });
-    } finally {
-      setLoading(false);
     }
   };
 
-  const fetchApprovalRules = async () => {
+  const handleReject = async (timesheetId) => {
     try {
-      // Mock approval rules
-      const mockRules = [
+      await axiosInstance.patch(
+        `/api/v1/time/timesheets/${timesheetId}/reject`,
         {
-          id: "1",
-          rule_type: "auto",
-          conditions: { max_hours_per_day: 8, max_total_hours: 40 },
-          auto_approve_threshold: 40,
-        },
-        {
-          id: "2",
-          rule_type: "manual",
-          conditions: { requires_manager_review: true },
-        },
-      ];
-      setApprovalRules(mockRules);
-    } catch (error) {
-      console.log("Approval rules not configured yet");
-    }
-  };
-
-  const detectDuplicates = async () => {
-    try {
-      // Mock duplicate detection
-      const duplicates = timesheets.filter(
-        (t) => t.employee_id === "EMP001" && t.week_start_date === "2025-08-04"
+          remarks: rejectionComment,
+        }
       );
-      setDuplicateTimesheets(duplicates);
-    } catch (error) {
-      toast({
-        title: "Error detecting duplicates",
-        description: error.message,
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handleBulkApprove = async () => {
-    if (selectedTimesheets.length === 0) return;
-
-    try {
-      const updatedTimesheets = timesheets.map((t) =>
-        selectedTimesheets.includes(t.id)
-          ? { ...t, status: "approved", approved_at: new Date().toISOString() }
-          : t
+      setTimesheets((prev) =>
+        prev.map((t) =>
+          t.id === timesheetId
+            ? { ...t, status: "rejected", comments: rejectionComment }
+            : t
+        )
       );
-      setTimesheets(updatedTimesheets);
       toast({
-        title: "Bulk approval completed",
-        description: `${selectedTimesheets.length} timesheets approved`,
+        title: "Timesheet rejected",
+        description: "Timesheet has been rejected successfully",
       });
-      setSelectedTimesheets([]);
-      fetchTimesheets();
+      setRejectionComment("");
+      setSelectedTimesheet(null);
     } catch (error) {
+      console.error("Error rejecting timesheet:", error);
       toast({
-        title: "Error in bulk approval",
-        description: error.message,
-        variant: "destructive",
-      });
-    }
-  };
-
-  const lockTimesheet = async (timesheetId) => {
-    try {
-      const updatedTimesheets = timesheets.map((t) =>
-        t.id === timesheetId
-          ? { ...t, status: "locked", locked_at: new Date().toISOString() }
-          : t
-      );
-      setTimesheets(updatedTimesheets);
-      toast({
-        title: "Timesheet locked",
-        description: "Timesheet is now locked for billing",
-      });
-      fetchTimesheets();
-    } catch (error) {
-      toast({
-        title: "Error locking timesheet",
-        description: error.message,
-        variant: "destructive",
-      });
-    }
-  };
-
-  const exportTimesheets = async (format) => {
-    try {
-      // Mock export
-      const data = `Timesheet Data for ${
-        selectedTimesheets.length > 0
-          ? selectedTimesheets.length
-          : timesheets.length
-      } entries`;
-      const blob = new Blob([data], { type: getContentType(format) });
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `timesheets_${format}_${
-        new Date().toISOString().split("T")[0]
-      }.${format}`;
-      a.click();
-      window.URL.revokeObjectURL(url);
-      toast({
-        title: "Export completed",
-        description: `Timesheets exported as ${format.toUpperCase()}`,
-      });
-    } catch (error) {
-      toast({
-        title: "Export failed",
-        description: error.message,
-        variant: "destructive",
-      });
-    }
-  };
-
-  const getContentType = (format) => {
-    switch (format) {
-      case "csv":
-        return "text/csv";
-      case "pdf":
-        return "application/pdf";
-      case "xlsx":
-        return "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
-      default:
-        return "text/plain";
-    }
-  };
-
-  const updateTimeEntry = async (entryId, updates) => {
-    try {
-      const updatedTimesheets = timesheets.map((t) =>
-        t.id === selectedTimesheet?.id
-          ? {
-              ...t,
-              time_entries: t.time_entries.map((e) =>
-                e.id === entryId ? { ...e, ...updates } : e
-              ),
-            }
-          : t
-      );
-      setTimesheets(updatedTimesheets);
-      toast({
-        title: "Time entry updated",
-        description: "Changes saved successfully",
-      });
-      fetchTimesheets();
-      setEditingEntry(null);
-    } catch (error) {
-      toast({
-        title: "Error updating entry",
-        description: error.message,
+        title: "Error rejecting timesheet",
+        description: error.response?.data?.error || error.message,
         variant: "destructive",
       });
     }
@@ -301,10 +784,10 @@ const TimesheetApproval = ({ userRole }) => {
     }
 
     const variants = {
-      submitted: { variant: "secondary", label: "🟡 Pending", icon: Clock },
+      pending: { variant: "secondary", label: "🟡 Pending", icon: Clock },
       approved: { variant: "default", label: "✅ Approved", icon: CheckCircle },
       rejected: { variant: "destructive", label: "🔴 Rejected", icon: XCircle },
-      draft: { variant: "outline", label: "Draft", icon: Edit3 },
+      draft: { variant: "outline", label: "Draft", icon: Clock },
     };
 
     const config = variants[status] || variants.draft;
@@ -318,17 +801,31 @@ const TimesheetApproval = ({ userRole }) => {
     );
   };
 
+  const groupedTimesheets = useMemo(() => {
+    const groups = {};
+    timesheets.forEach((timesheet) => {
+      const weekKey = `${timesheet.week_start_date} - ${timesheet.week_end_date}`;
+      if (!groups[weekKey]) {
+        groups[weekKey] = {
+          weekStart: timesheet.week_start_date,
+          timesheets: [],
+        };
+      }
+      groups[weekKey].timesheets.push(timesheet);
+    });
+    return Object.entries(groups).sort(
+      ([weekA], [weekB]) =>
+        new Date(weekB.split(" - ")[0]) - new Date(weekA.split(" - ")[0])
+    );
+  }, [timesheets]);
+
   const filteredTimesheets = timesheets.filter(
     (timesheet) =>
-      timesheet.employees.name
+      timesheet.employee.name
         .toLowerCase()
         .includes(searchTerm.toLowerCase()) ||
-      timesheet.employees.email.toLowerCase().includes(searchTerm.toLowerCase())
+      timesheet.employee.email.toLowerCase().includes(searchTerm.toLowerCase())
   );
-
-  const displayTimesheets = showDuplicates
-    ? duplicateTimesheets
-    : filteredTimesheets;
 
   return (
     <div className="space-y-6">
@@ -336,12 +833,11 @@ const TimesheetApproval = ({ userRole }) => {
       <div className="flex flex-wrap gap-4 items-center justify-between">
         <div className="flex gap-2">
           <Button
-            variant={filter === "submitted" ? "default" : "outline"}
-            onClick={() => setFilter("submitted")}
+            variant={filter === "pending" ? "default" : "outline"}
+            onClick={() => setFilter("pending")}
             size="sm"
           >
-            Pending ({timesheets.filter((t) => t.status === "submitted").length}
-            )
+            Pending ({timesheets.filter((t) => t.status === "pending").length})
           </Button>
           <Button
             variant={filter === "approved" ? "default" : "outline"}
@@ -365,62 +861,18 @@ const TimesheetApproval = ({ userRole }) => {
             All
           </Button>
         </div>
-
-        <div className="flex gap-2">
+        <div className="flex gap-2 items-center">
           <Input
             placeholder="Search employee..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-48"
           />
-          <Button
-            variant={showDuplicates ? "default" : "outline"}
-            onClick={() => setShowDuplicates(!showDuplicates)}
-            size="sm"
-          >
-            <Copy className="h-4 w-4 mr-2" />
-            Duplicates ({duplicateTimesheets.length})
-          </Button>
         </div>
       </div>
 
-      {/* Bulk Actions */}
-      {selectedTimesheets.length > 0 && (
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-4">
-              <span className="text-sm font-medium">
-                {selectedTimesheets.length} timesheet(s) selected
-              </span>
-              <div className="flex gap-2">
-                <Button onClick={handleBulkApprove} size="sm">
-                  <CheckCircle className="h-4 w-4 mr-2" />
-                  Bulk Approve
-                </Button>
-                <Button
-                  onClick={() => exportTimesheets("csv")}
-                  variant="outline"
-                  size="sm"
-                >
-                  <Download className="h-4 w-4 mr-2" />
-                  Export CSV
-                </Button>
-                <Button
-                  onClick={() => exportTimesheets("pdf")}
-                  variant="outline"
-                  size="sm"
-                >
-                  <Download className="h-4 w-4 mr-2" />
-                  Export PDF
-                </Button>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
       {/* Timesheets List */}
-      <div className="space-y-4">
+      <div className="space-y-8">
         {loading ? (
           <Card>
             <CardContent className="p-8 text-center">
@@ -428,208 +880,182 @@ const TimesheetApproval = ({ userRole }) => {
               <p>Loading timesheets...</p>
             </CardContent>
           </Card>
-        ) : displayTimesheets.length === 0 ? (
+        ) : filteredTimesheets.length === 0 ? (
           <Card>
             <CardContent className="p-8 text-center">
               <Calendar className="h-8 w-8 mx-auto mb-4 text-muted-foreground" />
-              <p className="text-muted-foreground">No timesheets found</p>
+              <p className="text-muted-foreground">
+                No timesheets found for the selected filter.
+              </p>
             </CardContent>
           </Card>
         ) : (
-          displayTimesheets.map((timesheet) => (
-            <Card key={timesheet.id} className="relative">
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <input
-                      type="checkbox"
-                      checked={selectedTimesheets.includes(timesheet.id)}
-                      onChange={(e) => {
-                        if (e.target.checked) {
-                          setSelectedTimesheets([
-                            ...selectedTimesheets,
-                            timesheet.id,
-                          ]);
-                        } else {
-                          setSelectedTimesheets(
-                            selectedTimesheets.filter(
-                              (id) => id !== timesheet.id
-                            )
-                          );
-                        }
-                      }}
-                      className="rounded"
-                    />
-                    <div>
-                      <CardTitle className="text-lg flex items-center gap-2">
-                        <User className="h-5 w-5" />
-                        {timesheet.employees.name}
-                        {showDuplicates && (
-                          <Badge variant="destructive">
-                            <AlertTriangle className="h-3 w-3 mr-1" />
-                            Duplicate
+          groupedTimesheets.map(([weekKey, { timesheets: weekTimesheets }]) => (
+            <div key={weekKey} className="space-y-4">
+              <h2 className="text-xl font-semibold">
+                Week of{" "}
+                {format(
+                  new Date(weekTimesheets[0].week_start_date),
+                  "MMM dd, yyyy"
+                )}{" "}
+                -{" "}
+                {format(
+                  new Date(weekTimesheets[0].week_end_date),
+                  "MMM dd, yyyy"
+                )}
+              </h2>
+              {weekTimesheets
+                .filter(
+                  (timesheet) =>
+                    timesheet.employee.name
+                      .toLowerCase()
+                      .includes(searchTerm.toLowerCase()) ||
+                    timesheet.employee.email
+                      .toLowerCase()
+                      .includes(searchTerm.toLowerCase())
+                )
+                .map((timesheet) => (
+                  <Card key={timesheet.id} className="relative">
+                    <CardHeader>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div>
+                            <CardTitle className="text-lg flex items-center gap-2">
+                              <User className="h-5 w-5" />
+                              {timesheet.employee.name}
+                            </CardTitle>
+                            <p className="text-sm text-muted-foreground">
+                              {timesheet.employee.email}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {getStatusBadge(
+                            timesheet.status,
+                            !!timesheet.locked_at
+                          )}
+                          <Badge variant="outline">
+                            {timesheet.total_hours}h total
                           </Badge>
-                        )}
-                      </CardTitle>
-                      <p className="text-sm text-muted-foreground">
-                        {timesheet.employees.email} • Week of{" "}
-                        {format(
-                          new Date(timesheet.week_start_date),
-                          "MMM dd, yyyy"
-                        )}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {getStatusBadge(timesheet.status, !!timesheet.locked_at)}
-                    <Badge variant="outline">
-                      {timesheet.total_hours}h total
-                    </Badge>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {/* Time Entries */}
-                  <div className="space-y-2">
-                    <h4 className="font-medium">Time Entries</h4>
-                    {timesheet.time_entries.map((entry) => (
-                      <div
-                        key={entry.id}
-                        className="flex items-center justify-between p-2 bg-muted rounded"
-                      >
-                        <div>
-                          <span className="font-medium">
-                            {format(new Date(entry.date), "MMM dd")}
-                          </span>
-                          <span className="mx-2">•</span>
-                          <span>{entry.hours}h</span>
-                          {entry.description && (
-                            <>
-                              <span className="mx-2">•</span>
-                              <span className="text-muted-foreground">
-                                {entry.description}
-                              </span>
-                            </>
+                        </div>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-4">
+                        {/* Time Entries */}
+                        <div className="space-y-2">
+                          <h4 className="font-medium">Time Entries</h4>
+                          {timesheet.entries.length === 0 ? (
+                            <p className="text-sm text-muted-foreground">
+                              No time entries for this timesheet.
+                            </p>
+                          ) : (
+                            timesheet.entries.map((entry) => (
+                              <div
+                                key={entry.id}
+                                className="flex items-center justify-between p-2 bg-muted rounded"
+                              >
+                                <div>
+                                  <span className="font-medium">
+                                    {format(new Date(entry.date), "MMM dd")}
+                                  </span>
+                                  <span className="mx-2">•</span>
+                                  <span>{entry.hours}h</span>
+                                  {entry.description && (
+                                    <>
+                                      <span className="mx-2">•</span>
+                                      <span className="text-muted-foreground">
+                                        {entry.description}
+                                      </span>
+                                    </>
+                                  )}
+                                  {entry.task && (
+                                    <>
+                                      <span className="mx-2">•</span>
+                                      <span className="text-muted-foreground">
+                                        Task: {entry.task.name} (Project:{" "}
+                                        {entry.task.project?.name || "Unknown"})
+                                      </span>
+                                    </>
+                                  )}
+                                </div>
+                              </div>
+                            ))
                           )}
                         </div>
-                        {userRole === "admin" && !timesheet.locked_at && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setEditingEntry(entry)}
-                          >
-                            <Edit3 className="h-4 w-4" />
-                          </Button>
-                        )}
-                      </div>
-                    ))}
-                  </div>
 
-                  {/* Action Buttons */}
-                  <div className="flex gap-2 pt-4 border-t">
-                    {timesheet.status === "submitted" && (
-                      <>
-                        <Button
-                          onClick={() => {
-                            const autoRule = approvalRules.find(
-                              (r) => r.rule_type === "auto"
-                            );
-                            if (
-                              autoRule &&
-                              timesheet.total_hours <=
-                                (autoRule.auto_approve_threshold || 40)
-                            ) {
-                              handleBulkApprove();
-                            }
-                          }}
-                          size="sm"
-                        >
-                          <CheckCircle className="h-4 w-4 mr-2" />
-                          Approve
-                        </Button>
-                        <Button variant="outline" size="sm">
-                          <XCircle className="h-4 w-4 mr-2" />
-                          Reject
-                        </Button>
-                      </>
-                    )}
-                    {timesheet.status === "approved" &&
-                      userRole === "admin" &&
-                      !timesheet.locked_at && (
-                        <Button
-                          onClick={() => lockTimesheet(timesheet.id)}
-                          variant="outline"
-                          size="sm"
-                        >
-                          <Lock className="h-4 w-4 mr-2" />
-                          Lock for Billing
-                        </Button>
-                      )}
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+                        {/* Action Buttons */}
+                        {timesheet.status === "pending" &&
+                          userRole === "admin" && (
+                            <div className="flex gap-2 pt-4 border-t">
+                              <Button
+                                onClick={() => handleApprove(timesheet.id)}
+                                size="sm"
+                              >
+                                <CheckCircle className="h-4 w-4 mr-2" />
+                                Approve
+                              </Button>
+                              <Dialog
+                                open={selectedTimesheet === timesheet.id}
+                                onOpenChange={(open) => {
+                                  setSelectedTimesheet(
+                                    open ? timesheet.id : null
+                                  );
+                                }}
+                              >
+                                <DialogTrigger asChild>
+                                  <Button variant="outline" size="sm">
+                                    <XCircle className="h-4 w-4 mr-2" />
+                                    Reject
+                                  </Button>
+                                </DialogTrigger>
+                                <DialogContent>
+                                  <DialogHeader>
+                                    <DialogTitle>Reject Timesheet</DialogTitle>
+                                  </DialogHeader>
+                                  <Textarea
+                                    placeholder="Reason for rejection..."
+                                    value={rejectionComment}
+                                    onChange={(e) =>
+                                      setRejectionComment(e.target.value)
+                                    }
+                                  />
+                                  <div className="flex gap-2 pt-4">
+                                    <Button
+                                      variant="outline"
+                                      onClick={() => setSelectedTimesheet(null)}
+                                    >
+                                      Cancel
+                                    </Button>
+                                    <Button
+                                      variant="destructive"
+                                      onClick={() => handleReject(timesheet.id)}
+                                      disabled={!rejectionComment.trim()}
+                                    >
+                                      Reject
+                                    </Button>
+                                  </div>
+                                </DialogContent>
+                              </Dialog>
+                            </div>
+                          )}
+                        {timesheet.status === "rejected" &&
+                          timesheet.comments && (
+                            <div className="pt-4">
+                              <h4 className="font-medium">Rejection Reason</h4>
+                              <p className="text-sm text-muted-foreground">
+                                {timesheet.comments}
+                              </p>
+                            </div>
+                          )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+            </div>
           ))
         )}
       </div>
-
-      {/* Edit Entry Dialog */}
-      {editingEntry && (
-        <Dialog
-          open={!!editingEntry}
-          onOpenChange={() => setEditingEntry(null)}
-        >
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Edit Time Entry</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div>
-                <Label>Hours</Label>
-                <Input
-                  type="number"
-                  step="0.5"
-                  value={editingEntry.hours}
-                  onChange={(e) =>
-                    setEditingEntry({
-                      ...editingEntry,
-                      hours: parseFloat(e.target.value),
-                    })
-                  }
-                />
-              </div>
-              <div>
-                <Label>Description</Label>
-                <Textarea
-                  value={editingEntry.description || ""}
-                  onChange={(e) =>
-                    setEditingEntry({
-                      ...editingEntry,
-                      description: e.target.value,
-                    })
-                  }
-                />
-              </div>
-              <div className="flex gap-2">
-                <Button
-                  onClick={() =>
-                    updateTimeEntry(editingEntry.id, {
-                      hours: editingEntry.hours,
-                      description: editingEntry.description,
-                    })
-                  }
-                >
-                  Save Changes
-                </Button>
-                <Button variant="outline" onClick={() => setEditingEntry(null)}>
-                  Cancel
-                </Button>
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
-      )}
     </div>
   );
 };

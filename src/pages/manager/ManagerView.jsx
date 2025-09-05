@@ -39,7 +39,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { format } from "date-fns";
+import { format, startOfWeek, endOfWeek } from "date-fns";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Calendar as CalendarComponent } from "@/components/ui/calendar";
+import axiosInstance from "../../services/axiosInstance";
 
 const ManagerView = () => {
   const { toast } = useToast();
@@ -51,190 +58,173 @@ const ManagerView = () => {
   const [filterProject, setFilterProject] = useState("all");
   const [filterFreelancer, setFilterFreelancer] = useState("all");
   const [searchTerm, setSearchTerm] = useState("");
+  const [dateRange, setDateRange] = useState({
+    start: startOfWeek(new Date(), { weekStartsOn: 1 }),
+    end: endOfWeek(new Date(), { weekStartsOn: 1 }),
+  });
+  const [filter, setFilter] = useState("all");
 
   useEffect(() => {
-    fetchMockData();
-  }, []);
+    let isMounted = true;
 
-  const fetchMockData = async () => {
-    setLoading(true);
-    try {
-      // Mock timesheet data
-      const mockTimesheets = [
-        {
-          id: "1",
-          employee_id: "EMP001",
-          employee_name: "John Smith",
-          project_name: "E-commerce Platform",
-          freelancer_type: "Full-time",
-          week_start: "2025-08-04",
-          week_end: "2025-08-10",
-          total_hours: 40,
-          status: "submitted",
-          submitted_at: "2025-08-10T17:00:00Z",
-          project_details: {
-            client: "TechCorp Inc.",
-            deadline: "2025-09-15",
-            priority: "high",
-          },
-        },
-        {
-          id: "2",
-          employee_id: "EMP002",
-          employee_name: "Sarah Johnson",
-          project_name: "Mobile App Design",
-          freelancer_type: "Part-time",
-          week_start: "2025-08-04",
-          week_end: "2025-08-10",
-          total_hours: 32,
-          status: "approved",
-          submitted_at: "2025-08-09T16:30:00Z",
-          project_details: {
-            client: "StartupXYZ",
-            deadline: "2025-08-30",
-            priority: "medium",
-          },
-        },
-        {
-          id: "3",
-          employee_id: "EMP003",
-          employee_name: "Mike Davis",
-          project_name: "Data Analytics Dashboard",
-          freelancer_type: "Contract",
-          week_start: "2025-08-04",
-          week_end: "2025-08-10",
-          total_hours: 35,
-          status: "submitted",
-          submitted_at: "2025-08-10T18:45:00Z",
-          project_details: {
-            client: "DataFlow Systems",
-            deadline: "2025-09-01",
-            priority: "high",
-          },
-        },
-        {
-          id: "4",
-          employee_id: "EMP004",
-          employee_name: "Lisa Chen",
-          project_name: "Marketing Website",
-          freelancer_type: "Freelancer",
-          week_start: "2025-08-04",
-          week_end: "2025-08-10",
-          total_hours: 28,
-          status: "rejected",
-          submitted_at: "2025-08-08T14:20:00Z",
-          project_details: {
-            client: "MarketPro Agency",
-            deadline: "2025-08-25",
-            priority: "low",
-          },
-        },
-      ];
+    const fetchData = async () => {
+      setLoading(true);
+      try {
+        // Fetch timesheets
+        await fetchTimesheets(isMounted);
 
-      // Mock team productivity data
-      const mockTeamProductivity = [
-        {
-          team_name: "Frontend Development",
-          members_count: 5,
-          total_hours: 180,
-          completed_tasks: 42,
-          productivity_score: 92,
-          efficiency_rating: "excellent",
-          key_metrics: {
-            on_time_delivery: 95,
-            quality_score: 88,
-            client_satisfaction: 94,
-          },
-        },
-        {
-          team_name: "Backend Development",
-          members_count: 4,
-          total_hours: 150,
-          completed_tasks: 38,
-          productivity_score: 87,
-          efficiency_rating: "good",
-          key_metrics: {
-            on_time_delivery: 90,
-            quality_score: 85,
-            client_satisfaction: 89,
-          },
-        },
-        {
-          team_name: "UI/UX Design",
-          members_count: 3,
-          total_hours: 105,
-          completed_tasks: 25,
-          productivity_score: 85,
-          efficiency_rating: "good",
-          key_metrics: {
-            on_time_delivery: 88,
-            quality_score: 92,
-            client_satisfaction: 91,
-          },
-        },
-        {
-          team_name: "Quality Assurance",
-          members_count: 2,
-          total_hours: 70,
-          completed_tasks: 18,
-          productivity_score: 75,
-          efficiency_rating: "needs_improvement",
-          key_metrics: {
-            on_time_delivery: 82,
-            quality_score: 78,
-            client_satisfaction: 85,
-          },
-        },
-      ];
+        // Fetch projects
+        const projectResponse = await axiosInstance.get("/api/v1/project");
+        const projectData = projectResponse.data.projects || [];
+        console.log("Fetched projects:", projectData);
 
-      // Mock project summaries
-      const mockProjectSummaries = [
-        {
-          project_id: "PROJ001",
-          project_name: "E-commerce Platform",
-          client: "TechCorp Inc.",
-          freelancers_assigned: 8,
-          total_hours_logged: 320,
-          budget_utilization: 75,
-          completion_percentage: 65,
-          status: "active",
-        },
-        {
-          project_id: "PROJ002",
-          project_name: "Mobile App Design",
-          client: "StartupXYZ",
-          freelancers_assigned: 4,
-          total_hours_logged: 180,
-          budget_utilization: 90,
-          completion_percentage: 95,
-          status: "completed",
-        },
-        {
-          project_id: "PROJ003",
-          project_name: "Data Analytics Dashboard",
-          client: "DataFlow Systems",
-          freelancers_assigned: 6,
-          total_hours_logged: 240,
-          budget_utilization: 60,
-          completion_percentage: 40,
-          status: "delayed",
-        },
-      ];
+        const formattedProjects = projectData.map((project) => ({
+          project_id: project.id,
+          project_name: project.name,
+          client: project.client || "Unknown Client",
+          freelancers_assigned: project.freelancers_assigned || 0,
+          total_hours_logged: project.total_hours_logged || 0,
+          budget_utilization: project.budget_utilization || 0,
+          completion_percentage: project.completion_percentage || 0,
+          status: project.status || "active",
+        }));
 
-      setTimesheets(mockTimesheets);
-      setTeamProductivity(mockTeamProductivity);
-      setProjectSummaries(mockProjectSummaries);
-    } catch (error) {
-      console.error("Error fetching mock data:", error);
-      toast({
-        title: "Error",
-        description: "Failed to load manager dashboard data",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
+        // Mock team productivity data
+        const mockTeamProductivity = [
+          {
+            team_name: "Frontend Development",
+            members_count: 5,
+            total_hours: 180,
+            completed_tasks: 42,
+            productivity_score: 92,
+            efficiency_rating: "excellent",
+            key_metrics: {
+              on_time_delivery: 95,
+              quality_score: 88,
+              client_satisfaction: 94,
+            },
+          },
+          {
+            team_name: "Backend Development",
+            members_count: 4,
+            total_hours: 150,
+            completed_tasks: 38,
+            productivity_score: 87,
+            efficiency_rating: "good",
+            key_metrics: {
+              on_time_delivery: 90,
+              quality_score: 85,
+              client_satisfaction: 89,
+            },
+          },
+          {
+            team_name: "UI/UX Design",
+            members_count: 3,
+            total_hours: 105,
+            completed_tasks: 25,
+            productivity_score: 85,
+            efficiency_rating: "good",
+            key_metrics: {
+              on_time_delivery: 88,
+              quality_score: 92,
+              client_satisfaction: 91,
+            },
+          },
+          {
+            team_name: "Quality Assurance",
+            members_count: 2,
+            total_hours: 70,
+            completed_tasks: 18,
+            productivity_score: 75,
+            efficiency_rating: "needs_improvement",
+            key_metrics: {
+              on_time_delivery: 82,
+              quality_score: 78,
+              client_satisfaction: 85,
+            },
+          },
+        ];
+
+        if (isMounted) {
+          setProjectSummaries(formattedProjects);
+          setTeamProductivity(mockTeamProductivity);
+        }
+      } catch (error) {
+        if (isMounted) {
+          console.error("Error fetching data:", error);
+          toast({
+            title: "Error",
+            description: "Failed to load manager dashboard data",
+            variant: "destructive",
+          });
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    const fetchTimesheets = async (isMounted) => {
+      try {
+        const response = await axiosInstance.get(
+          "/api/v1/time/timesheets/all",
+          {
+            params: {
+              week_start: format(dateRange.start, "yyyy-MM-dd"),
+              week_end: format(dateRange.end, "yyyy-MM-dd"),
+              status: filter === "all" ? undefined : filter,
+            },
+          }
+        );
+
+        const allTimesheets = Array.isArray(response.data)
+          ? response.data.map((timesheet) => ({
+              id: timesheet.id,
+              employee_id: timesheet.employee_id,
+              employee_name: timesheet.employee?.name || "Unknown",
+              project_name:
+                timesheet.entries?.[0]?.project?.name || "Unknown Project",
+              freelancer_type: timesheet.employee?.freelancer_type || "Unknown",
+              week_start: timesheet.week_start_date,
+              week_end: timesheet.week_end_date,
+              total_hours: timesheet.total_hours || 0,
+              status: timesheet.status,
+              submitted_at: timesheet.submitted_at || null,
+              project_details: {
+                client:
+                  timesheet.entries?.[0]?.project?.client || "Unknown Client",
+                deadline: timesheet.entries?.[0]?.project?.deadline || null,
+                priority: timesheet.entries?.[0]?.project?.priority || "low",
+              },
+              employees: {
+                id:
+                  timesheet.employee?.id || timesheet.employee_id || "Unknown",
+                name: timesheet.employee?.name || "Unknown",
+                email: timesheet.employee?.email || "Unknown",
+              },
+              entries: timesheet.entries || [],
+            }))
+          : [];
+
+        if (isMounted) {
+          setTimesheets(allTimesheets);
+          console.log("All Timesheets", allTimesheets);
+        }
+      } catch (error) {
+        if (isMounted) {
+          toast.error("Failed to fetch timesheets. Please try again.");
+          console.error("Error fetching timesheets:", error);
+        }
+      }
+    };
+
+    fetchData();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [dateRange, filter]);
 
   const filteredTimesheets = timesheets.filter((timesheet) => {
     const matchesProject =
@@ -328,6 +318,15 @@ const ManagerView = () => {
     });
   };
 
+  const handleDateSelect = (range) => {
+    if (range) {
+      setDateRange({
+        start: startOfWeek(range, { weekStartsOn: 1 }),
+        end: endOfWeek(range, { weekStartsOn: 1 }),
+      });
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -365,7 +364,7 @@ const ManagerView = () => {
 
         <TabsContent value="timesheets" className="space-y-4">
           {/* Filters */}
-          <div className="flex gap-4 items-center p-4 bg-muted/50 rounded-lg">
+          <div className="flex gap-4 items-center p-4 bg-muted/50 rounded-lg flex-wrap">
             <div className="flex items-center gap-2">
               <Filter className="h-4 w-4" />
               <Select value={filterProject} onValueChange={setFilterProject}>
@@ -400,6 +399,42 @@ const ManagerView = () => {
                 <SelectItem value="Freelancer">Freelancer</SelectItem>
               </SelectContent>
             </Select>
+
+            <Select value={filter} onValueChange={setFilter}>
+              <SelectTrigger className="w-48">
+                <SelectValue placeholder="Filter by Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Statuses</SelectItem>
+                <SelectItem value="submitted">Pending</SelectItem>
+                <SelectItem value="approved">Approved</SelectItem>
+                <SelectItem value="rejected">Rejected</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <div className="flex items-center gap-2">
+              <Calendar className="h-4 w-4" />
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="w-64 justify-start text-left"
+                  >
+                    <Calendar className="mr-2 h-4 w-4" />
+                    {format(dateRange.start, "MMM dd")} -{" "}
+                    {format(dateRange.end, "MMM dd, yyyy")}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0">
+                  <CalendarComponent
+                    mode="single"
+                    selected={dateRange.start}
+                    onSelect={handleDateSelect}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
 
             <div className="relative flex-1 max-w-sm">
               <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />

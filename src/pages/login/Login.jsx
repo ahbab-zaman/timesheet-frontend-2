@@ -194,7 +194,6 @@ const Login = () => {
   const dispatch = useDispatch();
   const [login, { error }] = useLoginMutation();
 
-  console.log(error, "error");
 
   useEffect(() => {
     if (user && !loading) {
@@ -258,35 +257,6 @@ const Login = () => {
     }
   };
 
-  // const handleUserLogin = async (e) => {
-  //   e.preventDefault();
-  //   setLoading(true);
-
-  //   try {
-  //     const credentials = { email, password };
-  //     const response = await login(credentials).unwrap();
-
-  //     if (response.error) {
-  //       toast.error("Invalid email or password.");
-  //       setLoading(false);
-  //       // return;
-  //     } else {
-  //       toast.success("Login successful.");
-  //       setLoading(false);
-  //     }
-
-  //     const user = verifyToken(response.token);
-  //     dispatch(setUser({ user: user, token: response.token }));
-  //     navigate(`/${user.role.toLowerCase()}/dashboard`);
-
-  //     setLoading(false);
-  //   } catch (error) {
-  //     toast.error("something went wrong!");
-  //     setLoading(false);
-  //     // return;
-  //   }
-  // };
-
   const handleUserLogin = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -303,6 +273,12 @@ const Login = () => {
         toast.success("Login successful.");
         // Save token to localStorage
         localStorage.setItem("authToken", response.token);
+        // Log user credentials (excluding password for security)
+        console.log("User Credentials:", {
+          email: email,
+          user: response.user, // Assuming response contains user data
+          token: response.token,
+        });
         setLoading(false);
       }
 
@@ -312,7 +288,7 @@ const Login = () => {
 
       setLoading(false);
     } catch (error) {
-      toast.error("something went wrong!");
+      toast.error("Something went wrong!");
       setLoading(false);
     }
   };

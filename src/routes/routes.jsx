@@ -14,7 +14,7 @@ import EmployeeMain from "@/pages/employee/EmployeeMain";
 const router = createBrowserRouter([
   // Root → redirect based on role if logged in
   {
-    path: "/",
+    path: "/home",
     element: (
       <ProtectedRoute>
         <RedirectToDashboard />
@@ -77,7 +77,7 @@ const router = createBrowserRouter([
 
   // Login → Public only
   {
-    path: "/login",
+    path: "/",
     element: (
       <PublicRoute>
         <Login />

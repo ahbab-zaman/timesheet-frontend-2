@@ -8,8 +8,6 @@ import {
   Users,
   Clock,
   LogOut,
-  CheckCircle,
-  XCircle,
   Filter,
   Calendar,
   Search,
@@ -19,6 +17,8 @@ import {
   BarChart3,
   Plus,
   Settings,
+  ChevronLeft,
+  CalendarIcon,
 } from "lucide-react";
 import {
   format,
@@ -32,10 +32,8 @@ import {
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import {
   Select,
@@ -44,6 +42,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import { Textarea } from "@/components/ui/textarea";
 import TaskManagement from "./ManagerTaskManagement";
 import LeaveApproval from "./ManagerLeave";
 import NotificationSystem from "./Notification";
@@ -51,119 +55,135 @@ import ManagerTimesheetView from "./ManagerView";
 import { toast } from "sonner";
 import { logout } from "@/redux/features/auth/authSlice";
 import { useDispatch } from "react-redux";
+import axiosInstance from "../../services/axiosInstance";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { DialogTrigger } from "@radix-ui/react-dialog";
 
-const TimesheetGrid = ({ timesheet }) => {
+const WeeklyTimesheet = ({ timesheet }) => {
   const weekStart = startOfWeek(new Date(timesheet.week_start_date), {
     weekStartsOn: 1,
   });
   const weekDates = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
 
-  const entriesByTask = timesheet.time_entries.reduce((acc, entry) => {
-    const taskKey = entry.tasks?.task_title || "No Task";
-    if (!acc[taskKey]) {
-      acc[taskKey] = {
-        taskTitle: entry.tasks?.task_title || "No Task",
-        projectName: entry.tasks?.projects?.name || "No Project",
-        entries: {},
-      };
-    }
-    acc[taskKey].entries[entry.date] = entry.hours;
-    return acc;
-  }, {});
+  const calculateDailyTotals = () => {
+    const timeEntries = Array.isArray(timesheet.entries)
+      ? timesheet.entries
+      : [];
+
+    const dailyTotals = new Array(7).fill(0);
+    const dailyEntries = Array.from({ length: 7 }, () => []);
+
+    timeEntries.forEach((entry) => {
+      if (!entry?.date || !entry?.hours) return;
+
+      const entryDate = new Date(entry.date).toISOString().slice(0, 10);
+      const dayIndex = weekDates.findIndex(
+        (date) => date.toISOString().slice(0, 10) === entryDate
+      );
+
+      if (dayIndex !== -1) {
+        dailyTotals[dayIndex] += Number(entry.hours) || 0;
+        dailyEntries[dayIndex].push(entry);
+      }
+    });
+
+    return {
+      dailyTotals: dailyTotals.map((hours) => Number(hours.toFixed(2))),
+      dailyEntries,
+    };
+  };
+
+  const { dailyTotals, dailyEntries } = calculateDailyTotals();
+  const [isTimesheetOpen, setIsTimesheetOpen] = useState(false);
 
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full border border-gray-200 rounded-lg">
-        <thead>
-          <tr className="bg-gray-100">
-            <th className="text-left p-3 font-medium border-r text-sm">
-              Task Name
-            </th>
-            {weekDates.map((date) => (
-              <th
+    <Card className="p-6 shadow-lg rounded-lg">
+      <Collapsible open={isTimesheetOpen} onOpenChange={setIsTimesheetOpen}>
+        <CollapsibleTrigger asChild>
+          <div className="flex items-center justify-between mb-4 cursor-pointer">
+            <h3 className="text-lg font-semibold text-gray-800">
+              Weekly Timesheet
+            </h3>
+            <ChevronDown
+              className={`h-5 w-5 text-gray-600 transition-transform duration-200 ${
+                isTimesheetOpen ? "rotate-180" : "rotate-0"
+              }`}
+            />
+          </div>
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <div className="space-y-6">
+            {weekDates.map((date, index) => (
+              <div
                 key={date.toISOString()}
-                className="text-center p-3 font-medium border-r min-w-[80px]"
+                className="border-b pb-4 last:border-b-0"
               >
-                <div className="text-xs text-gray-500">
-                  {format(date, "EEE")}
+                <div className="flex justify-between items-center mb-3">
+                  <h3 className="text-lg font-semibold text-gray-800">
+                    {format(date, "EEE")}
+                  </h3>
+                  <div className="text-sm font-medium text-blue-600 bg-blue-100 px-3 py-1 rounded-full">
+                    Total: {dailyTotals[index]} hours
+                  </div>
                 </div>
-                <div className="text-sm">{format(date, "dd")}</div>
-              </th>
-            ))}
-            <th className="text-center p-3 font-medium">Total</th>
-          </tr>
-        </thead>
-        <tbody>
-          {Object.entries(entriesByTask).map(([taskKey, taskData]) => {
-            const taskTotal = Object.values(taskData.entries).reduce(
-              (sum, hours) => sum + (hours || 0),
-              0
-            );
-            return (
-              <tr key={taskKey} className="border-t">
-                <td className="p-3 border-r">
-                  <div className="font-medium text-sm">
-                    {taskData.taskTitle}
-                  </div>
-                  <div className="text-xs text-gray-500">
-                    {taskData.projectName}
-                  </div>
-                </td>
-                {weekDates.map((date) => {
-                  const dateStr = format(date, "yyyy-MM-dd");
-                  const hours = taskData.entries[dateStr] || 0;
-                  return (
-                    <td
-                      key={date.toISOString()}
-                      className="text-center p-3 border-r"
-                    >
+                {dailyEntries[index].length > 0 ? (
+                  <div className="grid gap-3">
+                    {dailyEntries[index].map((entry) => (
                       <div
-                        className={`text-sm font-medium ${
-                          hours > 0 ? "text-blue-600" : "text-gray-500"
-                        }`}
+                        key={entry.id}
+                        className="flex items-center justify-between p-3 bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow duration-200 border border-gray-200"
                       >
-                        {hours > 0 ? `${hours}h` : "-"}
+                        <div className="flex items-center space-x-3">
+                          <Clock className="h-5 w-5 text-blue-600" />
+                          <div>
+                            <div className="font-medium text-sm">
+                              {entry.description || "No description"}
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                              Project:{" "}
+                              {entry.task?.project?.name || "No Project"} |
+                              Task: {entry.task?.name || "No Task"}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="text-sm font-medium text-gray-700">
+                          {entry.hours} hours
+                        </div>
                       </div>
-                    </td>
-                  );
-                })}
-                <td className="text-center p-3 font-bold">{taskTotal}h</td>
-              </tr>
-            );
-          })}
-          <tr className="border-t bg-gray-50">
-            <td className="p-3 border-r font-bold">Total Hours</td>
-            {weekDates.map((date) => {
-              const dateStr = format(date, "yyyy-MM-dd");
-              const dayTotal = Object.values(entriesByTask).reduce(
-                (sum, taskData) => sum + (taskData.entries[dateStr] || 0),
-                0
-              );
-              return (
-                <td
-                  key={date.toISOString()}
-                  className="text-center p-3 border-r font-bold"
-                >
-                  {dayTotal > 0 ? `${dayTotal}h` : "-"}
-                </td>
-              );
-            })}
-            <td className="text-center p-3 font-bold text-blue-600">
-              {timesheet.total_hours}h
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-muted-foreground text-sm text-center py-2">
+                    No time entries for this day
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </CollapsibleContent>
+      </Collapsible>
+      <div className="grid grid-cols-8 font-medium border-t pt-2 bg-muted px-4 py-2 rounded-md mt-4">
+        <div className="text-left">Total Hours</div>
+        {weekDates.map((_, i) => (
+          <div key={i} className="text-center">
+            {dailyTotals[i]}
+          </div>
+        ))}
+      </div>
+    </Card>
   );
 };
 
 const ManagerDashboard = () => {
   const navigate = useNavigate();
   const [timesheets, setTimesheets] = useState([]);
+  const [employees, setEmployees] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [selectedTimesheet, setSelectedTimesheet] = useState(null);
-  const [rejectionComment, setRejectionComment] = useState("");
+  const [user, setUser] = useState(null);
   const [filter, setFilter] = useState("submitted");
   const [userRole, setUserRole] = useState("manager");
   const [activeTab, setActiveTab] = useState("timesheets");
@@ -178,67 +198,10 @@ const ManagerDashboard = () => {
   const [configOpen, setConfigOpen] = useState(false);
   const [defaultPeriod, setDefaultPeriod] = useState("weekly");
   const [autoCreate, setAutoCreate] = useState(true);
+  const [currentWeekStart, setCurrentWeekStart] = useState(
+    startOfWeek(new Date(), { weekStartsOn: 1 })
+  );
   const dispatch = useDispatch();
-  const mockTimesheets = [
-    {
-      id: "1",
-      employee_id: "emp1",
-      week_start_date: "2025-08-18",
-      week_end_date: "2025-08-24",
-      total_hours: 40,
-      status: "submitted",
-      submitted_at: "2025-08-24T10:00:00Z",
-      comments: "Regular work week",
-      approval_stage: "pending",
-      requires_revision: false,
-      employees: { name: "John Doe", email: "john.doe@example.com" },
-      time_entries: [
-        {
-          date: "2025-08-18",
-          hours: 8,
-          description: "Development",
-          task_id: "task1",
-          tasks: { task_title: "Feature X", projects: { name: "Project A" } },
-        },
-        {
-          date: "2025-08-19",
-          hours: 8,
-          description: "Testing",
-          task_id: "task2",
-          tasks: { task_title: "Bug Fixes", projects: { name: "Project B" } },
-        },
-      ],
-    },
-    {
-      id: "2",
-      employee_id: "emp2",
-      week_start_date: "2025-08-18",
-      week_end_date: "2025-08-24",
-      total_hours: 35,
-      status: "approved",
-      submitted_at: "2025-08-23T09:00:00Z",
-      comments: "Partial week",
-      approval_stage: "approved",
-      requires_revision: false,
-      employees: { name: "Jane Smith", email: "jane.smith@example.com" },
-      time_entries: [
-        {
-          date: "2025-08-18",
-          hours: 7,
-          description: "Design",
-          task_id: "task3",
-          tasks: { task_title: "UI Design", projects: { name: "Project C" } },
-        },
-      ],
-    },
-  ];
-
-  useEffect(() => {
-    setTimeout(() => {
-      setTimesheets(mockTimesheets);
-      setLoading(false);
-    }, 1000);
-  }, [filter, dateRange]);
 
   const handleQuickFilter = (value) => {
     setQuickFilter(value);
@@ -249,48 +212,88 @@ const ManagerDashboard = () => {
           start: startOfWeek(now, { weekStartsOn: 1 }),
           end: endOfWeek(now, { weekStartsOn: 1 }),
         });
+        setCurrentWeekStart(startOfWeek(now, { weekStartsOn: 1 }));
         break;
       case "last-week":
         setDateRange({
           start: startOfWeek(subDays(now, 7), { weekStartsOn: 1 }),
           end: endOfWeek(subDays(now, 7), { weekStartsOn: 1 }),
         });
+        setCurrentWeekStart(startOfWeek(subDays(now, 7), { weekStartsOn: 1 }));
         break;
       case "last-30-days":
         setDateRange({
           start: subDays(now, 30),
           end: now,
         });
+        setCurrentWeekStart(startOfWeek(subDays(now, 30), { weekStartsOn: 1 }));
         break;
       case "this-month":
         setDateRange({
           start: startOfMonth(now),
           end: endOfMonth(now),
         });
+        setCurrentWeekStart(
+          startOfWeek(startOfMonth(now), { weekStartsOn: 1 })
+        );
         break;
     }
   };
 
-  const handleApprove = (timesheetId) => {
-    setTimesheets((prev) =>
-      prev.map((t) =>
-        t.id === timesheetId
-          ? { ...t, status: "approved", approved_at: new Date().toISOString() }
-          : t
-      )
-    );
+  const handlePreviousWeek = () => {
+    setCurrentWeekStart((prev) => addDays(prev, -7));
+    setDateRange({
+      start: addDays(dateRange.start, -7),
+      end: addDays(dateRange.end, -7),
+    });
   };
 
-  const handleReject = (timesheetId) => {
-    setTimesheets((prev) =>
-      prev.map((t) =>
-        t.id === timesheetId
-          ? { ...t, status: "rejected", comments: rejectionComment }
-          : t
-      )
-    );
-    setRejectionComment("");
-    setSelectedTimesheet(null);
+  const handleNextWeek = () => {
+    setCurrentWeekStart((prev) => addDays(prev, 7));
+    setDateRange({
+      start: addDays(dateRange.start, 7),
+      end: addDays(dateRange.end, 7),
+    });
+  };
+
+  const handleDateSelect = (date) => {
+    if (date) {
+      const weekStart = startOfWeek(date, { weekStartsOn: 1 });
+      setCurrentWeekStart(weekStart);
+      setDateRange({
+        start: weekStart,
+        end: endOfWeek(weekStart, { weekStartsOn: 1 }),
+      });
+    }
+  };
+
+  const handleSubmitTimesheet = async (timesheetId) => {
+    try {
+      const timesheet = timesheets.find((t) => t.id === timesheetId);
+      if (!timesheet || !timesheet.id) {
+        toast.error("No timesheet found for submission.");
+        return;
+      }
+
+      const response = await axiosInstance.patch(
+        `/api/v1/time/timesheets/${timesheetId}/submit`
+      );
+      setTimesheets((prev) =>
+        prev.map((t) =>
+          t.id === timesheetId
+            ? {
+                ...t,
+                status: "submitted",
+                submitted_at: new Date().toISOString(),
+              }
+            : t
+        )
+      );
+      toast.success("Timesheet submitted successfully!");
+    } catch (error) {
+      toast.error("Failed to submit timesheet. Please try again.");
+      console.error("Error submitting timesheet:", error);
+    }
   };
 
   const getStatusBadge = (status) => {
@@ -315,10 +318,105 @@ const ManagerDashboard = () => {
     setSelectedPeriod(defaultPeriod);
     setConfigOpen(false);
   };
+
   const handleLogout = () => {
     dispatch(logout());
     toast.success("Logout successful.");
   };
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const fetchCurrentUser = async () => {
+      try {
+        const response = await axiosInstance.get("/api/v1/employee");
+        const user = response.data.employees[0];
+        if (isMounted) {
+          setUser(user.id);
+        }
+      } catch (error) {
+        if (isMounted) {
+          toast.error("Failed to fetch user data. Please try again.");
+          console.error("Error fetching user data:", error);
+        }
+      }
+    };
+
+    const fetchEmployees = async () => {
+      try {
+        const response = await axiosInstance.get("/api/v1/employee", {
+          params: { page: 1, limit: 1000 },
+        });
+        if (isMounted) {
+          setEmployees(response.data.employees || []);
+        }
+      } catch (error) {
+        if (isMounted) {
+          toast.error("Failed to fetch employees. Please try again.");
+          console.error("Error fetching employees:", error);
+        }
+      }
+    };
+
+    const fetchTimesheets = async () => {
+      setLoading(true);
+      try {
+        const response = await axiosInstance.get(
+          "/api/v1/time/timesheets/all",
+          {
+            params: {
+              week_start: format(dateRange.start, "yyyy-MM-dd"),
+              week_end: format(dateRange.end, "yyyy-MM-dd"),
+              status: filter === "all" ? undefined : filter,
+            },
+          }
+        );
+
+        const allTimesheets = Array.isArray(response.data)
+          ? response.data.map((timesheet) => ({
+              ...timesheet,
+              employees: {
+                id:
+                  timesheet.employee?.id || timesheet.employee_id || "Unknown",
+                name: timesheet.employee?.name || "Unknown",
+                email: timesheet.employee?.email || "Unknown",
+              },
+              entries: timesheet.entries || [],
+            }))
+          : [];
+
+        if (isMounted) {
+          setTimesheets(allTimesheets);
+          console.log("All Timesheets", allTimesheets);
+        }
+      } catch (error) {
+        if (isMounted) {
+          toast.error("Failed to fetch timesheets. Please try again.");
+          console.error("Error fetching timesheets:", error);
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    const initializeData = async () => {
+      await fetchCurrentUser();
+      await fetchEmployees();
+      await fetchTimesheets();
+    };
+
+    initializeData();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [filter, dateRange]);
+
+  const weekDates = Array.from({ length: 7 }, (_, i) =>
+    addDays(currentWeekStart, i)
+  );
 
   if (loading) {
     return (
@@ -448,22 +546,44 @@ const ManagerDashboard = () => {
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <CalendarDays className="h-4 w-4 text-gray-500" />
-                  <Select value={quickFilter} onValueChange={handleQuickFilter}>
-                    <SelectTrigger className="w-40 text-sm">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="this-week">This Week</SelectItem>
-                      <SelectItem value="last-week">Last Week</SelectItem>
-                      <SelectItem value="this-month">This Month</SelectItem>
-                      <SelectItem value="last-30-days">Last 30 Days</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <div className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
-                    {format(dateRange.start, "MMM dd")} -{" "}
-                    {format(dateRange.end, "MMM dd, yyyy")}
-                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handlePreviousWeek}
+                    className="text-sm"
+                  >
+                    <ChevronLeft className="h-4 w-4 mr-2" />
+                    Previous Week
+                  </Button>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className="w-64 justify-start text-left text-sm"
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {format(weekDates[0], "MMM dd")} -{" "}
+                        {format(weekDates[6], "MMM dd, yyyy")}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0">
+                      <Calendar
+                        mode="single"
+                        selected={currentWeekStart}
+                        onSelect={handleDateSelect}
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleNextWeek}
+                    className="text-sm"
+                  >
+                    Next Week
+                    <ChevronRight className="h-4 w-4 ml-2" />
+                  </Button>
                 </div>
 
                 <div className="flex items-center gap-2 w-full sm:w-auto">
@@ -488,7 +608,7 @@ const ManagerDashboard = () => {
                 <div>
                   <Dialog open={configOpen} onOpenChange={setConfigOpen}>
                     <DialogTrigger asChild>
-                      <Button variant="outline">
+                      <Button variant="outline" className="text-sm">
                         <Settings className="h-4 w-4 mr-2" />
                         Configure
                       </Button>
@@ -648,33 +768,30 @@ const ManagerDashboard = () => {
                             </div>
                             <div className="text-xs text-gray-500">
                               {format(
-                                new Date(timesheet.submitted_at),
+                                new Date(timesheet.submitted_at || new Date()),
                                 "MMM dd"
                               )}
                             </div>
                           </div>
+                          {timesheet.status === "draft" && (
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleSubmitTimesheet(timesheet.id);
+                              }}
+                            >
+                              Submit Timesheet
+                            </Button>
+                          )}
                         </div>
                       </div>
 
                       {isExpanded && (
                         <CardContent className="p-0">
                           <div className="p-4 space-y-4">
-                            {timesheet.time_entries.length > 0 && (
-                              <div>
-                                <h4 className="font-medium mb-4 text-sm">
-                                  {timesheet.period_type
-                                    ? `${
-                                        timesheet.period_type
-                                          .charAt(0)
-                                          .toUpperCase() +
-                                        timesheet.period_type.slice(1)
-                                      } Timesheet Grid:`
-                                    : "Weekly Timesheet Grid:"}
-                                </h4>
-                                <TimesheetGrid timesheet={timesheet} />
-                              </div>
-                            )}
-
+                            <WeeklyTimesheet timesheet={timesheet} />
                             {timesheet.comments && (
                               <div>
                                 <h4 className="font-medium mb-2 text-sm">

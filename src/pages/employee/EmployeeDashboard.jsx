@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { format, addDays, startOfWeek, endOfWeek } from "date-fns";
 import {
@@ -5,12 +6,12 @@ import {
   ChevronLeft,
   ChevronRight,
   Filter,
-  LogOut,
   Search,
   Edit,
   Trash2,
   Loader2,
   ArrowLeft,
+  Clock,
 } from "lucide-react";
 import {
   Popover,
@@ -45,9 +46,18 @@ import { useDispatch } from "react-redux";
 import { logout } from "@/redux/features/auth/authSlice";
 import axiosInstance from "../../services/axiosInstance";
 import { Link } from "react-router-dom";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import { ChevronDown } from "lucide-react";
 
 export default function EmployeeDashboard() {
   const [currentWeekStart, setCurrentWeekStart] = useState(
+    startOfWeek(new Date(), { weekStartsOn: 1 })
+  );
+  const [leaveWeekStart, setLeaveWeekStart] = useState(
     startOfWeek(new Date(), { weekStartsOn: 1 })
   );
   const [leaveDialogOpen, setLeaveDialogOpen] = useState(false);
@@ -60,55 +70,148 @@ export default function EmployeeDashboard() {
   const [attachment, setAttachment] = useState();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoadingLeaves, setIsLoadingLeaves] = useState(false);
+  const [isLoadingTimeEntries, setIsLoadingTimeEntries] = useState(false);
   const [currentEmployee, setCurrentEmployee] = useState(null);
   const [leaveRequests, setLeaveRequests] = useState([]);
   const [selectedLeave, setSelectedLeave] = useState(null);
   const [statusFilter, setStatusFilter] = useState("All");
+  const [timeEntries, setTimeEntries] = useState([]);
+  const [isTimesheetOpen, setIsTimesheetOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
   const dispatch = useDispatch();
 
-  // Fetch employee details once on mount
   useEffect(() => {
+    let isMounted = true;
+
     const fetchCurrentEmployee = async () => {
       try {
-        const response = await axiosInstance.get("/api/v1/employee", {
-          params: { page: 1, limit: 1 },
-        });
-        const employee = response.data.employees[0];
-        setCurrentEmployee(employee);
-        console.log("Fetched employee data:", employee);
+        const response = await axiosInstance.get("/api/v1/employee");
+        if (isMounted) {
+          const employee = response.data.employees[0];
+          setCurrentEmployee(employee);
+          console.log("Fetched employee data:", employee);
+        }
       } catch (error) {
-        toast.error("Failed to fetch employee details. Please try again.");
-        console.error("Error fetching current employee:", error);
+        if (isMounted) {
+          toast.error("Failed to fetch employee details. Please try again.");
+          console.error("Error fetching current employee:", error);
+        }
       }
     };
 
     fetchCurrentEmployee();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   useEffect(() => {
-    if (!currentEmployee) return;
+    let isMounted = true;
 
     const fetchLeaveRequests = async () => {
+      if (!currentEmployee?.user_id) return;
       setIsLoadingLeaves(true);
       try {
         const response = await axiosInstance.get("/api/v1/leave", {
           params: { createdBy: currentEmployee.user_id },
         });
-        setLeaveRequests(response.data.leaves || []);
-        console.log("Fetched leave requests:", response.data.leaves);
+        if (isMounted) {
+          setLeaveRequests(response.data.leaves || []);
+        }
       } catch (error) {
-        toast.error("Failed to fetch leave requests. Please try again.");
-        console.error("Error fetching leave requests:", error);
+        if (isMounted) {
+          toast.error("Failed to fetch leave requests. Please try again.");
+          console.error("Error fetching leave requests:", error);
+        }
       } finally {
-        setIsLoadingLeaves(false);
+        if (isMounted) {
+          setIsLoadingLeaves(false);
+        }
       }
     };
 
     fetchLeaveRequests();
-
     const interval = setInterval(fetchLeaveRequests, 100000);
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(interval);
+      isMounted = false;
+    };
   }, [currentEmployee]);
+
+  const fetchTimeEntries = async (weekStart, weekEnd, employeeId) => {
+    if (!employeeId) {
+      toast.error("Employee ID not available. Please log in again.");
+      return;
+    }
+
+    setIsLoadingTimeEntries(true);
+    try {
+      console.log("Fetching time entries with params:", {
+        employee_id: employeeId,
+        week_start: weekStart,
+        week_end: weekEnd,
+      });
+      const response = await axiosInstance.get("/api/v1/time/timesheets/week", {
+        params: {
+          employee_id: employeeId,
+          week_start: weekStart,
+          week_end: weekEnd,
+        },
+      });
+
+      console.log("Time entries API response:", response.data);
+
+      let newEntries = [];
+      if (response.data?.timesheets?.[0]?.entries) {
+        newEntries = response.data.timesheets[0].entries;
+      } else if (response.data?.entries) {
+        newEntries = response.data.entries;
+      } else if (response.data?.timeEntries) {
+        newEntries = response.data.timeEntries;
+      }
+
+      if (!Array.isArray(newEntries)) {
+        console.warn("Received non-array time entries:", newEntries);
+        setTimeEntries([]);
+        return;
+      }
+
+      if (newEntries.length === 0) {
+        console.log("No time entries found for the given week.");
+      }
+
+      setTimeEntries(newEntries);
+    } catch (error) {
+      console.error("Failed to fetch time entries:", error.response || error);
+      toast.error(`Failed to load time entries: ${error.message}`);
+      setTimeEntries([]);
+    } finally {
+      setIsLoadingTimeEntries(false);
+    }
+  };
+
+  const refreshTimeEntries = () => {
+    if (currentEmployee?.id) {
+      const weekStart = format(currentWeekStart, "yyyy-MM-dd");
+      const weekEnd = format(
+        endOfWeek(currentWeekStart, { weekStartsOn: 1 }),
+        "yyyy-MM-dd"
+      );
+      fetchTimeEntries(weekStart, weekEnd, currentEmployee.id);
+    }
+  };
+
+  useEffect(() => {
+    if (currentEmployee?.id) {
+      const weekStart = format(currentWeekStart, "yyyy-MM-dd");
+      const weekEnd = format(
+        endOfWeek(currentWeekStart, { weekStartsOn: 1 }),
+        "yyyy-MM-dd"
+      );
+      fetchTimeEntries(weekStart, weekEnd, currentEmployee.id);
+    }
+  }, [currentEmployee, currentWeekStart]);
 
   const handlePreviousWeek = () => {
     setCurrentWeekStart((prev) => addDays(prev, -7));
@@ -121,6 +224,20 @@ export default function EmployeeDashboard() {
   const handleDateSelect = (date) => {
     if (date) {
       setCurrentWeekStart(startOfWeek(date, { weekStartsOn: 1 }));
+    }
+  };
+
+  const handleLeavePreviousWeek = () => {
+    setLeaveWeekStart((prev) => addDays(prev, -7));
+  };
+
+  const handleLeaveNextWeek = () => {
+    setLeaveWeekStart((prev) => addDays(prev, 7));
+  };
+
+  const handleLeaveDateSelect = (date) => {
+    if (date) {
+      setLeaveWeekStart(startOfWeek(date, { weekStartsOn: 1 }));
     }
   };
 
@@ -165,14 +282,11 @@ export default function EmployeeDashboard() {
         createdBy: parseInt(currentEmployee.user_id, 10),
       };
 
-      console.log("Submitting leave request:", leaveData);
-
       const response = await axiosInstance.post(
         "/api/v1/leave/create",
         leaveData
       );
       setLeaveRequests((prev) => [...prev, response.data.leave]);
-
       toast.success("📝 Your request has been sent to manager for approval");
 
       setLeaveDialogOpen(false);
@@ -244,8 +358,6 @@ export default function EmployeeDashboard() {
         createdBy: parseInt(currentEmployee.user_id, 10),
       };
 
-      console.log("Updating leave request:", leaveData);
-
       const response = await axiosInstance.patch(
         `/api/v1/leave/${selectedLeave.id}`,
         leaveData
@@ -255,7 +367,6 @@ export default function EmployeeDashboard() {
           leave.id === selectedLeave.id ? response.data.leave : leave
         )
       );
-
       toast.success("📝 Leave request updated successfully");
 
       setEditDialogOpen(false);
@@ -267,9 +378,9 @@ export default function EmployeeDashboard() {
       setAttachment(undefined);
     } catch (error) {
       if (error.response?.status === 400 && error.response?.data?.errors) {
-        const errorMessages = error.response.data.errors.map(
-          (err) => err.message
-        ).join;
+        const errorMessages = error.response.data.errors
+          .map((err) => err.message)
+          .join(", ");
         toast.error(`Failed to update leave request: ${errorMessages}`);
       } else {
         toast.error("Failed to update leave request. Please try again.");
@@ -290,7 +401,6 @@ export default function EmployeeDashboard() {
       setLeaveRequests((prev) =>
         prev.filter((leave) => leave.id !== selectedLeave.id)
       );
-
       toast.success("🗑️ Leave request deleted successfully");
 
       setDeleteDialogOpen(false);
@@ -303,52 +413,109 @@ export default function EmployeeDashboard() {
     }
   };
 
+  const handleLogout = () => {
+    dispatch(logout());
+    toast.success("Logout successful.");
+  };
+
   const weekDates = Array.from({ length: 7 }, (_, i) =>
     addDays(currentWeekStart, i)
   );
+  const leaveWeekDates = Array.from({ length: 7 }, (_, i) =>
+    addDays(leaveWeekStart, i)
+  );
 
-  // Filter leave requests that overlap with the current week and match the status filter
   const filteredLeaves = leaveRequests.filter((leave) => {
     const leaveStart = new Date(leave.fromDate);
     const leaveEnd = new Date(leave.toDate);
-    const weekStart = startOfWeek(currentWeekStart, { weekStartsOn: 1 });
-    const weekEnd = endOfWeek(currentWeekStart, { weekStartsOn: 1 });
+    const weekStart = startOfWeek(leaveWeekStart, { weekStartsOn: 1 });
+    const weekEnd = endOfWeek(leaveWeekStart, { weekStartsOn: 1 });
     const isInWeek = leaveStart <= weekEnd && leaveEnd >= weekStart;
     const matchesStatus =
       statusFilter === "All" || leave.status === statusFilter;
     return isInWeek && matchesStatus;
   });
 
+  const calculateDailyTotals = () => {
+    if (!Array.isArray(timeEntries)) {
+      console.error("timeEntries is not an array:", timeEntries);
+      return {
+        dailyTotals: new Array(7).fill(0),
+        dailyEntries: Array.from({ length: 7 }, () => []),
+      };
+    }
+
+    const dailyTotals = new Array(7).fill(0);
+    const dailyEntries = Array.from({ length: 7 }, () => []);
+
+    timeEntries.forEach((entry) => {
+      if (!entry?.date || !entry?.hours) return;
+
+      const entryDate = new Date(entry.date).toISOString().slice(0, 10);
+      const dayIndex = weekDates.findIndex(
+        (date) => date.toISOString().slice(0, 10) === entryDate
+      );
+
+      if (dayIndex !== -1) {
+        dailyTotals[dayIndex] += Number(entry.hours) || 0;
+        dailyEntries[dayIndex].push(entry);
+      }
+    });
+
+    return {
+      dailyTotals: dailyTotals.map((hours) => Number(hours.toFixed(2))),
+      dailyEntries,
+    };
+  };
+
+  const { dailyTotals, dailyEntries } = calculateDailyTotals();
+
+  if (!currentEmployee) {
+    return (
+      <div className="min-h-screen flex justify-center items-center">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto" />
+          <p className="text-muted-foreground mt-2">Loading employee data...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="p-6 space-y-4">
-      <div className="flex justify-between items-center">
-        <div className="flex items-center gap-2">
-          <Link to={"/employee/dashboard"}>
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-gray-100 p-6 space-y-4">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center">
+        <div className="flex items-center gap-2 mb-4 sm:mb-0">
+          <Link to="/employee/dashboard">
             <Button variant="outline">
-              <ArrowLeft />
+              <ArrowLeft className="h-4 w-4 mr-2" />
               Back to Dashboard
             </Button>
           </Link>
         </div>
         <div className="flex items-center space-x-2">
-          <div>
-            <EmployeeNotification />
-          </div>
+          <EmployeeNotification />
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
             <Input
               placeholder="Search current timesheet"
               className="pl-10 w-64"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
-          <Button variant="outline" size="sm">
+          <Button variant="outline" size="sm" onClick={() => setSearchTerm("")}>
             <Filter className="h-4 w-4 mr-2" />
-            Filter
+            Clear Search
+          </Button>
+          <Button variant="outline" onClick={handleLogout}>
+            <Clock className="h-4 w-4 mr-2" />
+            Sign Out
           </Button>
           <Dialog open={leaveDialogOpen} onOpenChange={setLeaveDialogOpen}>
             <DialogTrigger asChild>
               <Button variant="outline">
-                <CalendarIcon className="mr-2 h-4 w-4" /> Apply Leave
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                Apply Leave
               </Button>
             </DialogTrigger>
             <DialogContent className="sm:max-w-md">
@@ -564,70 +731,26 @@ export default function EmployeeDashboard() {
                 </Button>
               </DialogFooter>
             </DialogContent>
-          </Dialog>{" "}
+          </Dialog>
         </div>
       </div>
 
       <div>
-        <TimeTracker />
+        <TimeTracker
+          timeEntries={timeEntries}
+          setTimeEntries={setTimeEntries}
+          refreshTimeEntries={refreshTimeEntries}
+          currentEmployee={currentEmployee}
+        />
       </div>
 
       <div className="flex items-center justify-between">
+        <h3 className="text-lg font-semibold text-gray-800">Leave Requests</h3>
         <div className="flex items-center space-x-2">
-          <Button variant="ghost" size="sm" onClick={handlePreviousWeek}>
-            <ChevronLeft className="h-4 w-4 mr-2" />
-            Previous Week
-          </Button>
-
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button
-                variant="outline"
-                className="w-48 justify-start text-left font-normal"
-              >
-                <CalendarIcon className="mr-2 h-4 w-4" />
-                {`${format(weekDates[0], "MMM dd")} - ${format(
-                  weekDates[6],
-                  "MMM dd, yyyy"
-                )}`}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0">
-              <Calendar
-                mode="single"
-                selected={currentWeekStart}
-                onSelect={handleDateSelect}
-                initialFocus
-              />
-            </PopoverContent>
-          </Popover>
-
-          <Button variant="ghost" size="sm" onClick={handleNextWeek}>
-            Next Week
-            <ChevronRight className="h-4 w-4 ml-2" />
-          </Button>
-        </div>
-
-        <div className="flex items-center space-x-2">
-          <Select defaultValue="billable-first">
-            <SelectTrigger className="w-64">
-              <Filter className="h-4 w-4 mr-2" />
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="billable-first">
-                Billable first to Non-billable last
-              </SelectItem>
-              <SelectItem value="non-billable-first">
-                Non-billable first to Billable last
-              </SelectItem>
-              <SelectItem value="alphabetical">Alphabetical</SelectItem>
-            </SelectContent>
-          </Select>
           <Select value={statusFilter} onValueChange={setStatusFilter}>
             <SelectTrigger className="w-48">
               <Filter className="h-4 w-4 mr-2" />
-              <SelectValue placeholder="Filter by status" />
+              <SelectValue placeholder="Filter by Status" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="All">All Statuses</SelectItem>
@@ -639,9 +762,37 @@ export default function EmployeeDashboard() {
         </div>
       </div>
 
+      <div className="flex items-center mb-4">
+        <Button variant="ghost" size="sm" onClick={handleLeavePreviousWeek}>
+          <ChevronLeft className="h-4 w-4 mr-2" />
+          Previous Week
+        </Button>
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button variant="outline" className="w-64 justify-start text-left">
+              <CalendarIcon className="mr-2 h-4 w-4" />
+              {format(leaveWeekDates[0], "MMM dd")} -{" "}
+              {format(leaveWeekDates[6], "MMM dd, yyyy")}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-0">
+            <Calendar
+              mode="single"
+              selected={leaveWeekStart}
+              onSelect={handleLeaveDateSelect}
+              initialFocus
+            />
+          </PopoverContent>
+        </Popover>
+        <Button variant="ghost" size="sm" onClick={handleLeaveNextWeek}>
+          Next Week
+          <ChevronRight className="h-4 w-4 ml-2" />
+        </Button>
+      </div>
+
       <div className="grid grid-cols-7 text-center font-medium border-b pb-2">
-        {weekDates.map((date) => (
-          <div key={date.toISOString()}>{format(date, "EEE dd")}</div>
+        {leaveWeekDates.map((date) => (
+          <div key={date.toISOString()}>{format(date, "EEE")}</div>
         ))}
       </div>
 
@@ -736,25 +887,129 @@ export default function EmployeeDashboard() {
         )}
       </Card>
 
+      <div className="flex items-center justify-between">
+        <h3 className="text-lg font-semibold text-gray-800">Time Entries</h3>
+      </div>
+
+      <div className="flex items-center mb-4">
+        <Button variant="ghost" size="sm" onClick={handlePreviousWeek}>
+          <ChevronLeft className="h-4 w-4 mr-2" />
+          Previous Week
+        </Button>
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button variant="outline" className="w-64 justify-start text-left">
+              <CalendarIcon className="mr-2 h-4 w-4" />
+              {format(weekDates[0], "MMM dd")} -{" "}
+              {format(weekDates[6], "MMM dd, yyyy")}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-0">
+            <Calendar
+              mode="single"
+              selected={currentWeekStart}
+              onSelect={handleDateSelect}
+              initialFocus
+            />
+          </PopoverContent>
+        </Popover>
+        <Button variant="ghost" size="sm" onClick={handleNextWeek}>
+          Next Week
+          <ChevronRight className="h-4 w-4 ml-2" />
+        </Button>
+      </div>
+
       <Card className="p-6 shadow-lg rounded-lg">
-        <div className="font-semibold text-lg mb-4">Job Group: Billable</div>
-        <div className="text-muted-foreground text-center py-4">
-          No billable tasks assigned to you this week.
+        {isLoadingTimeEntries ? (
+          <div className="flex justify-center items-center py-4">
+            <Loader2 className="h-6 w-6 animate-spin text-primary" />
+          </div>
+        ) : (
+          <Collapsible open={isTimesheetOpen} onOpenChange={setIsTimesheetOpen}>
+            <CollapsibleTrigger asChild>
+              <div className="flex items-center justify-between mb-4 cursor-pointer">
+                <h3 className="text-lg font-semibold text-gray-800">
+                  Weekly Timesheet
+                </h3>
+                <ChevronDown
+                  className={`h-5 w-5 text-gray-600 transition-transform duration-200 ${
+                    isTimesheetOpen ? "rotate-180" : "rotate-0"
+                  }`}
+                />
+              </div>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <div className="space-y-6">
+                {weekDates.map((date, index) => (
+                  <div
+                    key={date.toISOString()}
+                    className="border-b pb-4 last:border-b-0"
+                  >
+                    <div className="flex justify-between items-center mb-3">
+                      <h3 className="text-lg font-semibold text-gray-800">
+                        {format(date, "EEE")}
+                      </h3>
+                      <div className="text-sm font-medium text-blue-600 bg-blue-100 px-3 py-1 rounded-full">
+                        Total: {dailyTotals[index]} hours
+                      </div>
+                    </div>
+                    {dailyEntries[index].length > 0 ? (
+                      <div className="grid gap-3">
+                        {dailyEntries[index]
+                          .filter((entry) =>
+                            entry.description
+                              ?.toLowerCase()
+                              .includes(searchTerm.toLowerCase())
+                          )
+                          .map((entry) => (
+                            <div
+                              key={entry.id}
+                              className="flex items-center justify-between p-3 bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow duration-200 border border-gray-200"
+                            >
+                              <div className="flex items-center space-x-3">
+                                <Clock className="h-5 w-5 text-blue-600" />
+                                <div>
+                                  <div className="font-medium text-sm">
+                                    {entry.description || "No description"}
+                                  </div>
+                                  <div className="text-xs text-muted-foreground">
+                                    Project:{" "}
+                                    {entry.task?.project?.name ||
+                                      entry.project_id ||
+                                      "No Project"}{" "}
+                                    | Task:{" "}
+                                    {entry.task?.name ||
+                                      entry.task_id ||
+                                      "No Task"}
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="text-sm font-medium text-gray-700">
+                                {entry.hours} hours
+                              </div>
+                            </div>
+                          ))}
+                      </div>
+                    ) : (
+                      <div className="text-muted-foreground text-sm text-center py-2">
+                        No time entries for this day
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
+        )}
+        <div className="grid grid-cols-8 font-medium border-t pt-2 bg-muted px-4 py-2 rounded-md mt-4">
+          <div className="text-left">Total Hours</div>
+          {weekDates.map((_, i) => (
+            <div key={i} className="text-center">
+              {dailyTotals[i]}
+            </div>
+          ))}
         </div>
       </Card>
-
-      <div className="grid grid-cols-8 font-medium border-t pt-2 bg-muted px-4 py-2 rounded-md">
-        <div className="text-left">Total Hours</div>
-        {weekDates.map((_, i) => (
-          <div key={i} className="text-center">
-            0
-          </div>
-        ))}
-      </div>
-
-      <div className="flex justify-end">
-        <Button variant="secondary">Submit Timesheet</Button>
-      </div>
     </div>
   );
 }

@@ -16,10 +16,10 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import axiosInstance from "../../services/axiosInstance"; // Import the axios instance
-import { useAuth } from "../../context/AuthContext"; // Import the auth hook
+import axiosInstance from "../../services/axiosInstance";
+import { useAuth } from "../../context/AuthContext";
 
-const TimeTracker = () => {
+const TimeTracker = ({ timeEntries, setTimeEntries }) => {
   const [isRunning, setIsRunning] = useState(false);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [isOpen, setIsOpen] = useState(false);
@@ -29,21 +29,18 @@ const TimeTracker = () => {
   const [selectedTask, setSelectedTask] = useState("");
   const [description, setDescription] = useState("");
   const [activeSession, setActiveSession] = useState(null);
-  const [timeEntries, setTimeEntries] = useState([]);
 
   const intervalRef = useRef(null);
   const startTimeRef = useRef(null);
 
   const user = useAuth();
-  const employeeId = user?.id || null; // Fallback to null if not loaded
-  console.log("Employee ID:", employeeId); // Debug log
+  const employeeId = user?.id || null;
 
-  // Fetch projects on component mount
   useEffect(() => {
     const fetchProjects = async () => {
       try {
-        const response = await axiosInstance.get("/api/v1/project"); // Updated to plural
-        console.log("Projects response:", response.data);
+        const response = await axiosInstance.get("/api/v1/project");
+        // console.log("Projects response:", response.data);
         setProjects(response?.data.projects || []);
       } catch (error) {
         console.error("Failed to fetch projects:", error);
@@ -53,15 +50,14 @@ const TimeTracker = () => {
     fetchProjects();
   }, []);
 
-  // Fetch tasks when project changes
   useEffect(() => {
     const fetchTasks = async () => {
       if (selectedProject) {
         try {
           const response = await axiosInstance.get(`/api/v1/task`); // Filter by project_id
           console.log("Tasks response:", response.data);
-          setTasks(response.data.tasks || []); // Adjust based on actual response structure
-          setSelectedTask(""); // Reset selected task when project changes
+          setTasks(response.data.tasks || []);
+          setSelectedTask("");
         } catch (error) {
           console.error("Failed to fetch tasks:", error);
           toast.error("Failed to load tasks");
@@ -74,7 +70,6 @@ const TimeTracker = () => {
     fetchTasks();
   }, [selectedProject]);
 
-  // Timer logic
   useEffect(() => {
     if (isRunning) {
       intervalRef.current = setInterval(() => {
@@ -104,10 +99,10 @@ const TimeTracker = () => {
       );
       return;
     }
-    if (!employeeId) {
-      toast.error("Employee ID not available. Please log in again.");
-      return;
-    }
+    // if (!employeeId) {
+    //   toast.error("Employee ID not available. Please log in again.");
+    //   return;
+    // }
     try {
       const response = await axiosInstance.post("/api/v1/time/clock-in", {
         project_id: selectedProject,
@@ -126,6 +121,20 @@ const TimeTracker = () => {
       setElapsedSeconds(0);
       startTimeRef.current = new Date();
       toast.success("Timer started");
+      // Update time entries after clock-in
+      const today = new Date();
+      const { weekStart, weekEnd } = getWeekRange(today);
+      const newResponse = await axiosInstance.get(
+        "/api/v1/time/timesheets/week",
+        {
+          params: {
+            employee_id: employeeId,
+            week_start: weekStart,
+            week_end: weekEnd,
+          },
+        }
+      );
+      setTimeEntries(newResponse.data.timeEntries || []);
     } catch (error) {
       toast.error(
         "Failed to start timer: " +
@@ -133,6 +142,7 @@ const TimeTracker = () => {
       );
     }
   };
+
   const pauseTimer = () => {
     setIsRunning(false);
   };
@@ -158,7 +168,20 @@ const TimeTracker = () => {
       setDescription("");
       setSelectedProject("");
       setSelectedTask("");
-      fetchTimeEntries(); // Refresh time entries after stop
+      // Update time entries after clock-out
+      const today = new Date();
+      const { weekStart, weekEnd } = getWeekRange(today);
+      const newResponse = await axiosInstance.get(
+        "/api/v1/time/timesheets/week",
+        {
+          params: {
+            employee_id: employeeId,
+            week_start: weekStart,
+            week_end: weekEnd,
+          },
+        }
+      );
+      setTimeEntries(newResponse.data.timeEntries || []);
     } catch (error) {
       toast.error(
         "Failed to stop timer: " +
@@ -174,29 +197,6 @@ const TimeTracker = () => {
     return `${hours.toString().padStart(2, "0")}:${minutes
       .toString()
       .padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
-  };
-
-  const fetchTimeEntries = async () => {
-    if (!employeeId) {
-      toast.error("Employee ID not available. Please log in again.");
-      return;
-    }
-    const today = new Date();
-    const { weekStart, weekEnd } = getWeekRange(today);
-    try {
-      const response = await axiosInstance.get("/api/v1/time/timesheets/week", {
-        params: {
-          employee_id: employeeId,
-          week_start: weekStart,
-          week_end: weekEnd,
-        },
-      });
-      setTimeEntries(response.data.timeEntries || []);
-      console.log(response.data.timeEntries);
-    } catch (error) {
-      console.error("Failed to fetch time entries:", error);
-      toast.error("Failed to load time entries");
-    }
   };
 
   const getWeekRange = (date) => {
@@ -216,12 +216,6 @@ const TimeTracker = () => {
       weekEnd: weekEnd.toISOString().slice(0, 10),
     };
   };
-
-  useEffect(() => {
-    if (isOpen) {
-      fetchTimeEntries();
-    }
-  }, [isOpen]);
 
   return (
     <Card className="w-full mx-auto rounded-lg border shadow-lg">
@@ -309,8 +303,7 @@ const TimeTracker = () => {
                           value={task.id}
                           className="hover:bg-blue-100"
                         >
-                          {task.title || task.task_title}{" "}
-                          {/* Fallback to task_title if title is undefined */}
+                          {task.title || task.task_title}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -364,59 +357,12 @@ const TimeTracker = () => {
                         onClick={stopTimer}
                         variant="destructive"
                         className="flex items-center gap-2 bg-red-600 text-white hover:bg-red-700"
+                        disabled={!activeSession}
                       >
                         <Square className="h-4 w-4" />
                         Stop
                       </Button>
                     </>
-                  )}
-                </div>
-
-                <div className="mt-6">
-                  <h4 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-                    <Clock className="h-5 w-5 text-blue-600" />
-                    Daily Time Entries
-                  </h4>
-                  {timeEntries.length > 0 ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                      {timeEntries.map((entry) => (
-                        <Card
-                          key={entry.id}
-                          className="bg-white shadow-lg hover:shadow-xl transition-shadow duration-300 border border-gray-200 rounded-lg overflow-hidden"
-                        >
-                          <CardContent className="p-4">
-                            <h5 className="font-medium text-gray-700">
-                              {entry.description || "No description"}
-                            </h5>
-                            <p className="text-sm text-gray-500">
-                              Date: {new Date(entry.date).toLocaleDateString()}
-                            </p>
-                            <p className="text-sm text-gray-500">
-                              Time:{" "}
-                              {formatTime(
-                                Math.floor(
-                                  (new Date(entry.clock_out || new Date()) -
-                                    new Date(entry.clock_in)) /
-                                    1000
-                                )
-                              )}
-                            </p>
-                            <div className="mt-2 flex justify-between items-center">
-                              <span className="text-xs text-blue-600 bg-blue-100 px-2 py-1 rounded-full">
-                                {entry.task ? entry.task.name : "Unknown Task"}
-                              </span>
-                              <span className="text-xs text-green-600 bg-green-100 px-2 py-1 rounded-full">
-                                {entry.hours || "0.00"} hrs
-                              </span>
-                            </div>
-                          </CardContent>
-                        </Card>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-center text-gray-500">
-                      No time entries for this week.
-                    </p>
                   )}
                 </div>
               </div>
