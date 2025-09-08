@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { format, addDays, startOfWeek, endOfWeek } from "date-fns";
 import {
@@ -162,15 +161,7 @@ export default function EmployeeDashboard() {
 
       console.log("Time entries API response:", response.data);
 
-      let newEntries = [];
-      if (response.data?.timesheets?.[0]?.entries) {
-        newEntries = response.data.timesheets[0].entries;
-      } else if (response.data?.entries) {
-        newEntries = response.data.entries;
-      } else if (response.data?.timeEntries) {
-        newEntries = response.data.timeEntries;
-      }
-
+      const newEntries = response.data.timeEntries || [];
       if (!Array.isArray(newEntries)) {
         console.warn("Received non-array time entries:", newEntries);
         setTimeEntries([]);
@@ -179,6 +170,8 @@ export default function EmployeeDashboard() {
 
       if (newEntries.length === 0) {
         console.log("No time entries found for the given week.");
+      } else {
+        console.log("Processed time entries:", newEntries);
       }
 
       setTimeEntries(newEntries);
@@ -448,17 +441,34 @@ export default function EmployeeDashboard() {
     const dailyTotals = new Array(7).fill(0);
     const dailyEntries = Array.from({ length: 7 }, () => []);
 
-    timeEntries.forEach((entry) => {
-      if (!entry?.date || !entry?.hours) return;
+    // Debug: Log local week date strings
+    const weekDateStrs = weekDates.map((date) => format(date, "yyyy-MM-dd"));
+    console.log("Current week local date strings:", weekDateStrs);
 
-      const entryDate = new Date(entry.date).toISOString().slice(0, 10);
-      const dayIndex = weekDates.findIndex(
-        (date) => date.toISOString().slice(0, 10) === entryDate
-      );
+    timeEntries.forEach((entry) => {
+      if (!entry?.date || !entry?.hours) {
+        console.warn("Invalid time entry:", entry);
+        return;
+      }
+
+      // Use entry.date directly (local string) and compare to local formatted week dates
+      const entryDate = entry.date; // e.g., "2025-09-08"
+      const dayIndex = weekDateStrs.indexOf(entryDate);
 
       if (dayIndex !== -1) {
         dailyTotals[dayIndex] += Number(entry.hours) || 0;
         dailyEntries[dayIndex].push(entry);
+        console.log(
+          `Matched entry ${entry.id} to day ${dayIndex} (${format(
+            weekDates[dayIndex],
+            "EEE, yyyy-MM-dd"
+          )})`
+        );
+      } else {
+        console.warn(
+          `Entry date ${entryDate} does not match any week date:`,
+          weekDateStrs
+        );
       }
     });
 
@@ -494,23 +504,6 @@ export default function EmployeeDashboard() {
         </div>
         <div className="flex items-center space-x-2">
           <EmployeeNotification />
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-            <Input
-              placeholder="Search current timesheet"
-              className="pl-10 w-64"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-          </div>
-          <Button variant="outline" size="sm" onClick={() => setSearchTerm("")}>
-            <Filter className="h-4 w-4 mr-2" />
-            Clear Search
-          </Button>
-          <Button variant="outline" onClick={handleLogout}>
-            <Clock className="h-4 w-4 mr-2" />
-            Sign Out
-          </Button>
           <Dialog open={leaveDialogOpen} onOpenChange={setLeaveDialogOpen}>
             <DialogTrigger asChild>
               <Button variant="outline">
@@ -746,20 +739,6 @@ export default function EmployeeDashboard() {
 
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-semibold text-gray-800">Leave Requests</h3>
-        <div className="flex items-center space-x-2">
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-48">
-              <Filter className="h-4 w-4 mr-2" />
-              <SelectValue placeholder="Filter by Status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="All">All Statuses</SelectItem>
-              <SelectItem value="Pending">Pending</SelectItem>
-              <SelectItem value="Approved">Approved</SelectItem>
-              <SelectItem value="Rejected">Rejected</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
       </div>
 
       <div className="flex items-center mb-4">
@@ -975,6 +954,7 @@ export default function EmployeeDashboard() {
                                   <div className="text-xs text-muted-foreground">
                                     Project:{" "}
                                     {entry.task?.project?.name ||
+                                      entry.project?.name ||
                                       entry.project_id ||
                                       "No Project"}{" "}
                                     | Task:{" "}

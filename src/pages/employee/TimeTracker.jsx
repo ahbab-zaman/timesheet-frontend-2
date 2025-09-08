@@ -19,7 +19,12 @@ import {
 import axiosInstance from "../../services/axiosInstance";
 import { useAuth } from "../../context/AuthContext";
 
-const TimeTracker = ({ timeEntries, setTimeEntries }) => {
+const TimeTracker = ({
+  timeEntries,
+  setTimeEntries,
+  refreshTimeEntries,
+  currentEmployee,
+}) => {
   const [isRunning, setIsRunning] = useState(false);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [isOpen, setIsOpen] = useState(false);
@@ -33,14 +38,22 @@ const TimeTracker = ({ timeEntries, setTimeEntries }) => {
   const intervalRef = useRef(null);
   const startTimeRef = useRef(null);
 
-  const user = useAuth();
-  const employeeId = user?.id || null;
+  const employeeId = currentEmployee?.id || null;
+
+  // Helper to get local date string in YYYY-MM-DD format
+  const getLocalDateString = () => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, "0");
+    const day = String(now.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  };
 
   useEffect(() => {
     const fetchProjects = async () => {
       try {
         const response = await axiosInstance.get("/api/v1/project");
-        // console.log("Projects response:", response.data);
+        console.log("Projects response:", response.data);
         setProjects(response?.data.projects || []);
       } catch (error) {
         console.error("Failed to fetch projects:", error);
@@ -54,7 +67,9 @@ const TimeTracker = ({ timeEntries, setTimeEntries }) => {
     const fetchTasks = async () => {
       if (selectedProject) {
         try {
-          const response = await axiosInstance.get(`/api/v1/task`); // Filter by project_id
+          const response = await axiosInstance.get(`/api/v1/task`, {
+            params: { project_id: selectedProject },
+          });
           console.log("Tasks response:", response.data);
           setTasks(response.data.tasks || []);
           setSelectedTask("");
@@ -94,22 +109,26 @@ const TimeTracker = ({ timeEntries, setTimeEntries }) => {
 
   const startTimer = async () => {
     if (!selectedProject || !selectedTask) {
-      toast.success(
+      toast.error(
         "Please select a project and task before starting the timer."
       );
       return;
     }
-    // if (!employeeId) {
-    //   toast.error("Employee ID not available. Please log in again.");
-    //   return;
-    // }
+    if (!employeeId) {
+      toast.error("Employee ID not available. Please log in again.");
+      return;
+    }
     try {
+      const localDate = getLocalDateString();
+      console.log("Sending local date for clock-in:", localDate);
       const response = await axiosInstance.post("/api/v1/time/clock-in", {
         project_id: selectedProject,
         employee_id: employeeId,
         task_id: selectedTask,
         description,
+        date: localDate,
       });
+      console.log("Clock-in response:", response.data);
       setActiveSession({
         ...response.data,
         project_id: selectedProject,
@@ -121,21 +140,9 @@ const TimeTracker = ({ timeEntries, setTimeEntries }) => {
       setElapsedSeconds(0);
       startTimeRef.current = new Date();
       toast.success("Timer started");
-      // Update time entries after clock-in
-      const today = new Date();
-      const { weekStart, weekEnd } = getWeekRange(today);
-      const newResponse = await axiosInstance.get(
-        "/api/v1/time/timesheets/week",
-        {
-          params: {
-            employee_id: employeeId,
-            week_start: weekStart,
-            week_end: weekEnd,
-          },
-        }
-      );
-      setTimeEntries(newResponse.data.timeEntries || []);
+      refreshTimeEntries();
     } catch (error) {
+      console.error("Failed to start timer:", error.response || error);
       toast.error(
         "Failed to start timer: " +
           (error.response?.data?.error || error.message)
@@ -145,6 +152,7 @@ const TimeTracker = ({ timeEntries, setTimeEntries }) => {
 
   const pauseTimer = () => {
     setIsRunning(false);
+    toast.success("Timer paused");
   };
 
   const resumeTimer = () => {
@@ -152,15 +160,21 @@ const TimeTracker = ({ timeEntries, setTimeEntries }) => {
       new Date().getTime() - elapsedSeconds * 1000
     );
     setIsRunning(true);
+    toast.success("Timer resumed");
   };
 
   const stopTimer = async () => {
     if (!activeSession) return;
     try {
+      const localDate = getLocalDateString();
+      console.log("Sending local date for clock-out:", localDate);
       const response = await axiosInstance.post(
         `/api/v1/time/clock-out/${activeSession.id}`,
-        {}
+        {
+          date: localDate,
+        }
       );
+      console.log("Clock-out response:", response.data);
       toast.success(`Time logged: ${formatTime(elapsedSeconds)}`);
       setActiveSession(null);
       setIsRunning(false);
@@ -168,21 +182,9 @@ const TimeTracker = ({ timeEntries, setTimeEntries }) => {
       setDescription("");
       setSelectedProject("");
       setSelectedTask("");
-      // Update time entries after clock-out
-      const today = new Date();
-      const { weekStart, weekEnd } = getWeekRange(today);
-      const newResponse = await axiosInstance.get(
-        "/api/v1/time/timesheets/week",
-        {
-          params: {
-            employee_id: employeeId,
-            week_start: weekStart,
-            week_end: weekEnd,
-          },
-        }
-      );
-      setTimeEntries(newResponse.data.timeEntries || []);
+      refreshTimeEntries();
     } catch (error) {
+      console.error("Failed to stop timer:", error.response || error);
       toast.error(
         "Failed to stop timer: " +
           (error.response?.data?.error || error.message)
@@ -197,24 +199,6 @@ const TimeTracker = ({ timeEntries, setTimeEntries }) => {
     return `${hours.toString().padStart(2, "0")}:${minutes
       .toString()
       .padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
-  };
-
-  const getWeekRange = (date) => {
-    const inputDate = new Date(date);
-    const day = inputDate.getDay();
-    const diffToMonday = (day + 6) % 7;
-    const weekStart = new Date(inputDate);
-    weekStart.setDate(inputDate.getDate() - diffToMonday);
-    weekStart.setHours(0, 0, 0, 0);
-
-    const weekEnd = new Date(weekStart);
-    weekEnd.setDate(weekStart.getDate() + 6);
-    weekEnd.setHours(23, 59, 59, 999);
-
-    return {
-      weekStart: weekStart.toISOString().slice(0, 10),
-      weekEnd: weekEnd.toISOString().slice(0, 10),
-    };
   };
 
   return (
