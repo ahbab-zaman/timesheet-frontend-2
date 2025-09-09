@@ -52,6 +52,19 @@ import {
 } from "@/components/ui/collapsible";
 import { ChevronDown } from "lucide-react";
 
+const formatTime = (totalSeconds) => {
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+
+  const parts = [];
+  if (hours > 0) parts.push(`${hours} hr${hours !== 1 ? "s" : ""}`);
+  if (minutes > 0) parts.push(`${minutes} min${minutes !== 1 ? "s" : ""}`);
+  if (seconds > 0) parts.push(`${seconds} sec${seconds !== 1 ? "s" : ""}`);
+
+  return parts.length > 0 ? parts.join(" ") : "0 sec";
+};
+
 export default function EmployeeDashboard() {
   const [currentWeekStart, setCurrentWeekStart] = useState(
     startOfWeek(new Date(), { weekStartsOn: 1 })
@@ -247,15 +260,11 @@ export default function EmployeeDashboard() {
       toast.error("Please select a start date.");
       return;
     }
-    if (!toDate) {
-      toast.error("Please select an end date.");
-      return;
-    }
     if (!reason.trim()) {
       toast.error("Please provide a reason for the leave.");
       return;
     }
-    if (new Date(toDate) < new Date(fromDate)) {
+    if (toDate && new Date(toDate) < new Date(fromDate)) {
       toast.error("End date cannot be before start date.");
       return;
     }
@@ -269,7 +278,7 @@ export default function EmployeeDashboard() {
         employeeDepartment: currentEmployee.department,
         leaveType,
         fromDate,
-        toDate,
+        toDate: toDate || fromDate, // Default to fromDate if toDate is not provided
         reason,
         attachment: attachment || null,
         createdBy: parseInt(currentEmployee.user_id, 10),
@@ -323,15 +332,11 @@ export default function EmployeeDashboard() {
       toast.error("Please select a start date.");
       return;
     }
-    if (!toDate) {
-      toast.error("Please select an end date.");
-      return;
-    }
     if (!reason.trim()) {
       toast.error("Please provide a reason for the leave.");
       return;
     }
-    if (new Date(toDate) < new Date(fromDate)) {
+    if (toDate && new Date(toDate) < new Date(fromDate)) {
       toast.error("End date cannot be before start date.");
       return;
     }
@@ -345,7 +350,7 @@ export default function EmployeeDashboard() {
         employeeDepartment: currentEmployee.department,
         leaveType,
         fromDate,
-        toDate,
+        toDate: toDate || fromDate, // Default to fromDate if toDate is not provided
         reason,
         attachment: attachment || null,
         createdBy: parseInt(currentEmployee.user_id, 10),
@@ -420,7 +425,7 @@ export default function EmployeeDashboard() {
 
   const filteredLeaves = leaveRequests.filter((leave) => {
     const leaveStart = new Date(leave.fromDate);
-    const leaveEnd = new Date(leave.toDate);
+    const leaveEnd = new Date(leave.toDate || leave.fromDate); // Use fromDate if toDate is null
     const weekStart = startOfWeek(leaveWeekStart, { weekStartsOn: 1 });
     const weekEnd = endOfWeek(leaveWeekStart, { weekStartsOn: 1 });
     const isInWeek = leaveStart <= weekEnd && leaveEnd >= weekStart;
@@ -433,12 +438,16 @@ export default function EmployeeDashboard() {
     if (!Array.isArray(timeEntries)) {
       console.error("timeEntries is not an array:", timeEntries);
       return {
-        dailyTotals: new Array(7).fill(0),
+        dailyTotals: new Array(7).fill({ hours: 0, minutes: 0, seconds: 0 }),
         dailyEntries: Array.from({ length: 7 }, () => []),
       };
     }
 
-    const dailyTotals = new Array(7).fill(0);
+    const dailyTotals = new Array(7).fill().map(() => ({
+      hours: 0,
+      minutes: 0,
+      seconds: 0,
+    }));
     const dailyEntries = Array.from({ length: 7 }, () => []);
 
     // Debug: Log local week date strings
@@ -451,13 +460,39 @@ export default function EmployeeDashboard() {
         return;
       }
 
+      // Convert entry.hours (assumed to be in decimal hours) to seconds
+      const totalSeconds = Math.round(Number(entry.hours) * 3600);
+      const hours = Math.floor(totalSeconds / 3600);
+      const minutes = Math.floor((totalSeconds % 3600) / 60);
+      const seconds = totalSeconds % 60;
+
       // Use entry.date directly (local string) and compare to local formatted week dates
       const entryDate = entry.date; // e.g., "2025-09-08"
       const dayIndex = weekDateStrs.indexOf(entryDate);
 
       if (dayIndex !== -1) {
-        dailyTotals[dayIndex] += Number(entry.hours) || 0;
-        dailyEntries[dayIndex].push(entry);
+        dailyTotals[dayIndex].hours += hours;
+        dailyTotals[dayIndex].minutes += minutes;
+        dailyTotals[dayIndex].seconds += seconds;
+
+        // Handle overflow in seconds and minutes
+        if (dailyTotals[dayIndex].seconds >= 60) {
+          dailyTotals[dayIndex].minutes += Math.floor(
+            dailyTotals[dayIndex].seconds / 60
+          );
+          dailyTotals[dayIndex].seconds = dailyTotals[dayIndex].seconds % 60;
+        }
+        if (dailyTotals[dayIndex].minutes >= 60) {
+          dailyTotals[dayIndex].hours += Math.floor(
+            dailyTotals[dayIndex].minutes / 60
+          );
+          dailyTotals[dayIndex].minutes = dailyTotals[dayIndex].minutes % 60;
+        }
+
+        dailyEntries[dayIndex].push({
+          ...entry,
+          totalSeconds, // Store total seconds for rendering individual entries
+        });
         console.log(
           `Matched entry ${entry.id} to day ${dayIndex} (${format(
             weekDates[dayIndex],
@@ -473,7 +508,7 @@ export default function EmployeeDashboard() {
     });
 
     return {
-      dailyTotals: dailyTotals.map((hours) => Number(hours.toFixed(2))),
+      dailyTotals,
       dailyEntries,
     };
   };
@@ -515,7 +550,8 @@ export default function EmployeeDashboard() {
               <DialogHeader>
                 <DialogTitle>Submit Leave Request</DialogTitle>
                 <DialogDescription>
-                  Fill in the details for your leave request.
+                  Fill in the details for your leave request. For a single-day
+                  leave, you can leave the "To Date" field empty.
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-4">
@@ -554,7 +590,7 @@ export default function EmployeeDashboard() {
                   </div>
                   <div className="w-full">
                     <label className="block text-sm font-medium mb-1">
-                      To Date *
+                      To Date (Optional)
                     </label>
                     <Input
                       type="date"
@@ -608,7 +644,8 @@ export default function EmployeeDashboard() {
               <DialogHeader>
                 <DialogTitle>Edit Leave Request</DialogTitle>
                 <DialogDescription>
-                  Update the details for your leave request.
+                  Update the details for your leave request. For a single-day
+                  leave, you can leave the "To Date" field empty.
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-4">
@@ -647,7 +684,7 @@ export default function EmployeeDashboard() {
                   </div>
                   <div className="w-full">
                     <label className="block text-sm font-medium mb-1">
-                      To Date *
+                      To Date (Optional)
                     </label>
                     <Input
                       type="date"
@@ -795,8 +832,15 @@ export default function EmployeeDashboard() {
                         {leave.leaveType}
                       </div>
                       <div className="text-sm text-muted-foreground">
-                        {format(new Date(leave.fromDate), "MMM dd, yyyy")} -{" "}
-                        {format(new Date(leave.toDate), "MMM dd, yyyy")}
+                        {format(new Date(leave.fromDate), "MMM dd, yyyy")}
+                        {leave.toDate && leave.toDate !== leave.fromDate ? (
+                          <>
+                            {" "}
+                            - {format(new Date(leave.toDate), "MMM dd, yyyy")}
+                          </>
+                        ) : (
+                          ""
+                        )}
                       </div>
                     </div>
                   </div>
@@ -928,8 +972,13 @@ export default function EmployeeDashboard() {
                       <h3 className="text-lg font-semibold text-gray-800">
                         {format(date, "EEE")}
                       </h3>
-                      <div className="text-sm font-medium text-blue-600 bg-blue-100 px-3 py-1 rounded-full">
-                        Total: {dailyTotals[index]} hours
+                      <div className="text-sm font-medium text-blue-800 bg-gradient-to-r from-blue-100 to-blue-200 px-3 py-1 rounded-full shadow-sm">
+                        Total:{" "}
+                        {formatTime(
+                          dailyTotals[index].hours * 3600 +
+                            dailyTotals[index].minutes * 60 +
+                            dailyTotals[index].seconds
+                        )}
                       </div>
                     </div>
                     {dailyEntries[index].length > 0 ? (
@@ -964,8 +1013,8 @@ export default function EmployeeDashboard() {
                                   </div>
                                 </div>
                               </div>
-                              <div className="text-sm font-medium text-gray-700">
-                                {entry.hours} hours
+                              <div className="text-sm font-medium text-gray-800 bg-gradient-to-r from-gray-100 to-gray-200 px-2 py-1 rounded-md shadow-sm">
+                                {formatTime(entry.totalSeconds)}
                               </div>
                             </div>
                           ))}
@@ -982,10 +1031,17 @@ export default function EmployeeDashboard() {
           </Collapsible>
         )}
         <div className="grid grid-cols-8 font-medium border-t pt-2 bg-muted px-4 py-2 rounded-md mt-4">
-          <div className="text-left">Total Hours</div>
+          <div className="text-left">Total Time</div>
           {weekDates.map((_, i) => (
-            <div key={i} className="text-center">
-              {dailyTotals[i]}
+            <div
+              key={i}
+              className="text-center text-sm font-medium text-blue-800 bg-gradient-to-r from-blue-50 to-blue-100 px-2 py-1 rounded-md shadow-sm"
+            >
+              {formatTime(
+                dailyTotals[i].hours * 3600 +
+                  dailyTotals[i].minutes * 60 +
+                  dailyTotals[i].seconds
+              )}
             </div>
           ))}
         </div>

@@ -165,6 +165,10 @@ const TimeTracker = ({
 
   const stopTimer = async () => {
     if (!activeSession) return;
+    if (elapsedSeconds < 60) {
+      toast.error("You cannot stop the timer until one minute has elapsed.");
+      return;
+    }
     try {
       const localDate = getLocalDateString();
       console.log("Sending local date for clock-out:", localDate);
