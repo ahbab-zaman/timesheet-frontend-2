@@ -2,7 +2,7 @@ import axios from "axios";
 const FALLBACK_API_BASE_URL =
   process.env.NODE_ENV === "production"
     ? "https://timeserver.airepro.in"
-    : "http://localhost:4001";
+    : "http://localhost:8108";
 
 const axiosInstance = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || FALLBACK_API_BASE_URL,
