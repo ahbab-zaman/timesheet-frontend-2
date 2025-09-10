@@ -187,8 +187,6 @@ const Login = () => {
   const [fullName, setFullName] = useState("");
   const [loading, setLoading] = useState(false);
   const { signIn, signUp, user } = useAuth();
-  // const navigate = useNavigate();
-  // const { toast, ToastContainer } = useToast();
 
   const navigate = useNavigate();
   const dispatch = useDispatch();

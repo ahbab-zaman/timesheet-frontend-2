@@ -17,7 +17,6 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import axiosInstance from "../../services/axiosInstance";
-import { useAuth } from "../../context/AuthContext";
 
 const TimeTracker = ({
   timeEntries,
