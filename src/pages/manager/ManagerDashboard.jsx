@@ -63,6 +63,14 @@ import {
 } from "@/components/ui/popover";
 import { DialogTrigger } from "@radix-ui/react-dialog";
 
+// Utility function to format time in hours, minutes, and seconds
+const formatTime = (totalHours) => {
+  const hours = Math.floor(totalHours);
+  const minutes = Math.floor((totalHours - hours) * 60);
+  const seconds = Math.floor(((totalHours - hours) * 60 - minutes) * 60);
+  return { hours, minutes, seconds };
+};
+
 const WeeklyTimesheet = ({ timesheet }) => {
   const weekStart = startOfWeek(new Date(timesheet.week_start_date), {
     weekStartsOn: 1,
@@ -126,8 +134,13 @@ const WeeklyTimesheet = ({ timesheet }) => {
                   <h3 className="text-lg font-semibold text-gray-800">
                     {format(date, "EEE")}
                   </h3>
-                  <div className="text-sm font-medium text-blue-600 bg-blue-100 px-3 py-1 rounded-full">
-                    Total: {dailyTotals[index]} hours
+                  <div className="text-sm font-medium text-blue-600 bg-blue-100 px-3 py-1 rounded-full flex items-center space-x-1">
+                    <Clock className="h-4 w-4" />
+                    <span>
+                      Total: {formatTime(dailyTotals[index]).hours}h{" "}
+                      {formatTime(dailyTotals[index]).minutes}m{" "}
+                      {formatTime(dailyTotals[index]).seconds}s
+                    </span>
                   </div>
                 </div>
                 {dailyEntries[index].length > 0 ? (
@@ -151,7 +164,9 @@ const WeeklyTimesheet = ({ timesheet }) => {
                           </div>
                         </div>
                         <div className="text-sm font-medium text-gray-700">
-                          {entry.hours} hours
+                          {formatTime(entry.hours).hours}h{" "}
+                          {formatTime(entry.hours).minutes}m{" "}
+                          {formatTime(entry.hours).seconds}s
                         </div>
                       </div>
                     ))}
@@ -170,7 +185,9 @@ const WeeklyTimesheet = ({ timesheet }) => {
         <div className="text-left">Total Hours</div>
         {weekDates.map((_, i) => (
           <div key={i} className="text-center">
-            {dailyTotals[i]}
+            {formatTime(dailyTotals[i]).hours}h{" "}
+            {formatTime(dailyTotals[i]).minutes}m{" "}
+            {formatTime(dailyTotals[i]).seconds}s
           </div>
         ))}
       </div>
@@ -184,7 +201,7 @@ const ManagerDashboard = () => {
   const [employees, setEmployees] = useState([]);
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState(null);
-  const [filter, setFilter] = useState("submitted");
+  const [filter, setFilter] = useState("all");
   const [userRole, setUserRole] = useState("manager");
   const [activeTab, setActiveTab] = useState("timesheets");
   const [employeeSearchTerm, setEmployeeSearchTerm] = useState("");
@@ -763,8 +780,10 @@ const ManagerDashboard = () => {
                         <div className="flex items-center gap-3">
                           {getStatusBadge(timesheet.status)}
                           <div className="text-right">
-                            <div className="text-lg font-bold">
-                              {timesheet.total_hours}h
+                            <div className="text-lg font-bold bg-gradient-to-r from-blue-500 to-indigo-500 text-white px-3 py-1 rounded-full inline-block">
+                              {formatTime(timesheet.total_hours).hours}h{" "}
+                              {formatTime(timesheet.total_hours).minutes}m{" "}
+                              {formatTime(timesheet.total_hours).seconds}s
                             </div>
                             <div className="text-xs text-gray-500">
                               {format(

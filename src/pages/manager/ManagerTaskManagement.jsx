@@ -26,7 +26,8 @@ import {
   Calendar,
   Clock,
   Filter,
-  MoreHorizontal,
+  Edit2,
+  Trash2,
 } from "lucide-react";
 import { format } from "date-fns";
 import {
@@ -45,12 +46,6 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import debounce from "lodash.debounce";
 import axiosInstance from "../../services/axiosInstance";
 
@@ -79,7 +74,6 @@ const TaskManagement = () => {
   const [milestoneRecurring, setMilestoneRecurring] = useState("");
   const [showNewProject, setShowNewProject] = useState(false);
 
-  // Debounce search input
   const debouncedSetSearchTerm = useCallback(
     debounce((value) => {
       setSearchTerm(value);
@@ -87,76 +81,74 @@ const TaskManagement = () => {
     []
   );
 
-  // Cleanup debounce on unmount
   useEffect(() => {
     return () => {
       debouncedSetSearchTerm.cancel();
     };
   }, [debouncedSetSearchTerm]);
 
-  // Fetch data with error handling
-  const fetchData = useCallback(async () => {
-    setLoading(true);
-    try {
-      const [projRes, empRes, taskRes] = await Promise.all([
-        axiosInstance.get("/api/v1/project"),
-        axiosInstance.get("/api/v1/employee"),
-        axiosInstance.get("/api/v1/task"),
-      ]);
+  const fetchData = useCallback(
+    async (signal) => {
+      setLoading(true);
+      try {
+        const [projRes, empRes, taskRes] = await Promise.all([
+          axiosInstance.get("/api/v1/project", { signal }),
+          axiosInstance.get("/api/v1/employee", { signal }),
+          axiosInstance.get("/api/v1/task", { signal }),
+        ]);
 
-      const projData = Array.isArray(projRes.data.projects)
-        ? projRes.data.projects
-        : projRes.data.projects || [];
-      setProjects(projData);
-
-      const empData = Array.isArray(empRes.data.employees)
-        ? empRes.data.employees
-        : empRes.data.employees || [];
-      setEmployees(empData);
-
-      const fetchedTasks = taskRes.data.tasks || taskRes.data || [];
-      console.log("Fetched tasks:", fetchedTasks); // Debug: Inspect raw task data
-      setTasks(fetchedTasks);
-
-      setActivities(
-        fetchedTasks.map((task) => ({
-          id: task.id,
-          status: task.status ? task.status.toUpperCase() : "ASSIGNED",
-          project: task.project?.name || task.project_id || "N/A",
-          project_type: task.project_type || "N/A",
-          milestone_recurring: task.milestone_description || "N/A",
-          freelancer: task.employee?.name || task.employee_id || "N/A",
-          task: task.title || "Untitled",
-          start_date: task.start_date
-            ? format(new Date(task.start_date), "yyyy-MM-dd")
-            : format(new Date(task.created_at || Date.now()), "yyyy-MM-dd"),
-          due_date: task.due_date
-            ? format(new Date(task.due_date), "yyyy-MM-dd")
-            : "N/A",
-          project_id: task.project?.id || task.project_id,
-          employee_id: task.employee?.id || task.employee_id,
-        }))
-      );
-    } catch (error) {
-      console.error("Fetch error:", error);
-      toast({
-        title: "Error fetching data",
-        description: "Failed to load data. Check console for details.",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
-  }, [toast]);
+        setProjects(
+          Array.isArray(projRes.data.projects) ? projRes.data.projects : []
+        );
+        setEmployees(
+          Array.isArray(empRes.data.employees) ? empRes.data.employees : []
+        );
+        const fetchedTasks = taskRes.data.tasks || [];
+        setTasks(fetchedTasks);
+        setActivities(
+          fetchedTasks.map((task) => ({
+            id: task.id,
+            status: task.status ? task.status.toUpperCase() : "ASSIGNED",
+            project: task.project?.name || task.project_id || "N/A",
+            project_type: task.project_type || "N/A",
+            milestone_recurring: task.milestone_description || "N/A",
+            freelancer: task.employee?.name || task.employee_id || "N/A",
+            task: task.title || "Untitled",
+            start_date: task.start_date
+              ? format(new Date(task.start_date), "yyyy-MM-dd")
+              : format(new Date(task.created_at || Date.now()), "yyyy-MM-dd"),
+            due_date: task.due_date
+              ? format(new Date(task.due_date), "yyyy-MM-dd")
+              : "N/A",
+            project_id: task.project?.id || task.project_id,
+            employee_id: task.employee?.id || task.employee_id,
+          }))
+        );
+      } catch (error) {
+        if (error.name !== "AbortError") {
+          toast({
+            title: "Error fetching data",
+            description: "Failed to load data.",
+            variant: "destructive",
+          });
+        }
+      } finally {
+        setLoading(false);
+      }
+    },
+    [toast]
+  );
 
   useEffect(() => {
-    fetchData();
+    const controller = new AbortController();
+    fetchData(controller.signal);
+    return () => controller.abort();
   }, [fetchData]);
 
   useEffect(() => {
     if (editingTask) {
       const taskToEdit = tasks.find((t) => t.id === editingTask.id);
-      if (taskToEdit && taskToEdit.id === editingTask.id) {
+      if (taskToEdit) {
         setSelectedProject(taskToEdit.project_id?.toString() || "");
         setSelectedEmployee(taskToEdit.employee_id?.toString() || "");
         setTaskTitle(taskToEdit.title || "");
@@ -170,7 +162,7 @@ const TaskManagement = () => {
         setErrors({});
       }
     }
-  }, [editingTask?.id, tasks]);
+  }, [editingTask, tasks]);
 
   const resetForm = useCallback(() => {
     setSelectedProject("");
@@ -190,24 +182,16 @@ const TaskManagement = () => {
 
   const validateForm = useCallback(() => {
     const err = {};
-    if (!showNewProject && !selectedProject) {
+    if (!showNewProject && !selectedProject)
       err.project = "Project is required";
-    }
-    if (showNewProject && !newProjectName) {
+    if (showNewProject && !newProjectName)
       err.newProject = "New project name is required";
-    }
-    if (!selectedEmployee) {
-      err.employee = "Employee is required";
-    }
-    if (!taskTitle) {
-      err.title = "Task title is required";
-    }
-    if (estimatedHours && isNaN(parseFloat(estimatedHours))) {
+    if (!selectedEmployee) err.employee = "Employee is required";
+    if (!taskTitle) err.title = "Task title is required";
+    if (estimatedHours && isNaN(parseFloat(estimatedHours)))
       err.estimatedHours = "Estimated hours must be a number";
-    }
-    if (startDate && dueDate && new Date(startDate) > new Date(dueDate)) {
+    if (startDate && dueDate && new Date(startDate) > new Date(dueDate))
       err.dueDate = "Due date must be after or equal to start date";
-    }
     setErrors(err);
     return Object.keys(err).length === 0;
   }, [
@@ -223,18 +207,15 @@ const TaskManagement = () => {
 
   const handleSubmit = useCallback(async () => {
     if (!validateForm()) return;
-
     setLoading(true);
     try {
       let projectId = selectedProject;
-
       if (showNewProject) {
         const newProjRes = await axiosInstance.post("/api/v1/project/create", {
           name: newProjectName,
         });
         projectId = newProjRes.data.project?.id || newProjRes.data.id;
       }
-
       const taskData = {
         project_id: parseInt(projectId),
         employee_id: parseInt(selectedEmployee),
@@ -247,32 +228,28 @@ const TaskManagement = () => {
         milestone_description: milestoneRecurring,
         status: editingTask ? editingTask.status.toLowerCase() : "assigned",
       };
-
       if (editingTask) {
         await axiosInstance.patch(`/api/v1/task/${editingTask.id}`, taskData);
         toast({
-          title: "Activity updated successfully! 🎯",
+          title: "Activity updated successfully!",
           description: "The activity has been updated.",
         });
       } else {
         await axiosInstance.post("/api/v1/task/create", taskData);
         toast({
-          title: "Activity created successfully! 🎯",
-          description: "The activity has been assigned to the freelancer.",
+          title: "Activity created successfully!",
+          description: "The activity has been assigned.",
         });
       }
-
-      await fetchData();
-      setIsDialogOpen(false); // Close dialog before resetting form
       resetForm();
+      setIsDialogOpen(false);
+      await fetchData(new AbortController().signal);
     } catch (error) {
-      console.error("Submit error:", error);
       toast({
         title: editingTask
           ? "Error updating activity"
           : "Error creating activity",
-        description:
-          "Failed to process the activity. Check console for details.",
+        description: "Failed to process the activity.",
         variant: "destructive",
       });
     } finally {
@@ -306,13 +283,11 @@ const TaskManagement = () => {
           title: "Activity deleted successfully",
           description: "The activity has been removed.",
         });
-        await fetchData();
+        await fetchData(new AbortController().signal);
       } catch (error) {
-        console.error("Delete error:", error);
         toast({
           title: "Error deleting activity",
-          description:
-            "Failed to delete the activity. Check console for details.",
+          description: "Failed to delete the activity.",
           variant: "destructive",
         });
       } finally {
@@ -323,7 +298,7 @@ const TaskManagement = () => {
   );
 
   const getStatusDisplay = useCallback((status) => {
-    return status; // Return plain text instead of Badge
+    return <Badge>{status}</Badge>;
   }, []);
 
   const getProjectTypeBadge = useCallback((type) => {
@@ -341,22 +316,14 @@ const TaskManagement = () => {
   }, []);
 
   const filteredActivities = useMemo(() => {
-    console.log("Filtering with statusFilter:", statusFilter); // Debug: Log current filter
-    console.log(
-      "Available statuses:",
-      Array.from(new Set(activities.map((a) => a.status)))
-    ); // Debug: Log unique status values
-
     return activities.filter((activity) => {
       const matchesSearch =
         searchTerm === "" ||
         activity.project.toLowerCase().includes(searchTerm.toLowerCase()) ||
         activity.task.toLowerCase().includes(searchTerm.toLowerCase()) ||
         activity.freelancer.toLowerCase().includes(searchTerm.toLowerCase());
-
       const matchesStatus =
         statusFilter === "all" || activity.status === statusFilter;
-
       return matchesSearch && matchesStatus;
     });
   }, [activities, searchTerm, statusFilter]);
@@ -375,7 +342,7 @@ const TaskManagement = () => {
         <div>
           <h2 className="text-2xl font-bold">Task Management</h2>
           <p className="text-muted-foreground">
-            Manage activities and projects for your team
+            Manage activities and projects
           </p>
         </div>
       </div>
@@ -410,8 +377,8 @@ const TaskManagement = () => {
                 </DialogTitle>
                 <DialogDescription>
                   {editingTask
-                    ? "Update the activity details."
-                    : "Create and assign a new activity to a freelancer."}
+                    ? "Update activity details."
+                    : "Create and assign a new activity."}
                 </DialogDescription>
               </DialogHeader>
               <div className="grid gap-4 py-4">
@@ -428,15 +395,14 @@ const TaskManagement = () => {
                             <SelectValue placeholder="Select a project" />
                           </SelectTrigger>
                           <SelectContent>
-                            {Array.isArray(projects) &&
-                              projects.map((project) => (
-                                <SelectItem
-                                  key={project.id}
-                                  value={project.id.toString()}
-                                >
-                                  {project.name}
-                                </SelectItem>
-                              ))}
+                            {projects.map((project) => (
+                              <SelectItem
+                                key={project.id}
+                                value={project.id.toString()}
+                              >
+                                {project.name}
+                              </SelectItem>
+                            ))}
                           </SelectContent>
                         </Select>
                         {errors.project && (
@@ -444,7 +410,18 @@ const TaskManagement = () => {
                             {errors.project}
                           </p>
                         )}
-                       
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setShowNewProject(true);
+                            setSelectedProject("");
+                          }}
+                          className="w-full"
+                        >
+                          Create New Project
+                        </Button>
                       </div>
                     ) : (
                       <div className="space-y-2">
@@ -483,15 +460,14 @@ const TaskManagement = () => {
                         <SelectValue placeholder="Select a freelancer" />
                       </SelectTrigger>
                       <SelectContent>
-                        {Array.isArray(employees) &&
-                          employees.map((employee) => (
-                            <SelectItem
-                              key={employee.id}
-                              value={employee.id.toString()}
-                            >
-                              {employee.name} ({employee.department || "N/A"})
-                            </SelectItem>
-                          ))}
+                        {employees.map((employee) => (
+                          <SelectItem
+                            key={employee.id}
+                            value={employee.id.toString()}
+                          >
+                            {employee.name} ({employee.department || "N/A"})
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                     {errors.employee && (
@@ -539,7 +515,6 @@ const TaskManagement = () => {
                       <p className="text-red-500 text-sm">{errors.title}</p>
                     )}
                   </div>
-
                   <div className="space-y-2">
                     <Label htmlFor="description">Description</Label>
                     <Textarea
@@ -595,7 +570,10 @@ const TaskManagement = () => {
                 <div className="flex justify-end gap-2 pt-4">
                   <Button
                     variant="outline"
-                    onClick={() => setIsDialogOpen(false)}
+                    onClick={() => {
+                      resetForm();
+                      setIsDialogOpen(false);
+                    }}
                   >
                     Cancel
                   </Button>
@@ -671,7 +649,9 @@ const TaskManagement = () => {
                       <TableHead className="font-semibold text-black">
                         Due Date
                       </TableHead>
-                      <TableHead className="font-semibold text-black w-12"></TableHead>
+                      <TableHead className="font-semibold text-black w-24">
+                        Actions
+                      </TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -683,8 +663,7 @@ const TaskManagement = () => {
                             No Data Found
                           </h3>
                           <p className="text-gray-500">
-                            It looks like there are no activities to display.
-                            Try adding a new one!
+                            No activities to display. Try adding a new one!
                           </p>
                         </TableCell>
                       </TableRow>
@@ -694,8 +673,8 @@ const TaskManagement = () => {
                           key={activity.id}
                           className="hover:bg-muted/50"
                         >
-                          <TableCell className="badge">
-                            <Badge>{getStatusDisplay(activity.status)}</Badge>
+                          <TableCell>
+                            {getStatusDisplay(activity.status)}
                           </TableCell>
                           <TableCell className="font-medium">
                             {activity.project}
@@ -712,30 +691,25 @@ const TaskManagement = () => {
                           <TableCell>{activity.task}</TableCell>
                           <TableCell>{activity.start_date}</TableCell>
                           <TableCell>{activity.due_date}</TableCell>
-                          <TableCell>
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="sm">
-                                  <MoreHorizontal className="h-4 w-4" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
-                                <DropdownMenuItem
-                                  onClick={() => {
-                                    setEditingTask(activity);
-                                    setIsDialogOpen(true);
-                                  }}
-                                >
-                                  Edit Activity
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
-                                  className="text-red-600"
-                                  onClick={() => handleDelete(activity.id)}
-                                >
-                                  Delete
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
+                          <TableCell className="flex gap-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                setEditingTask(activity);
+                                setIsDialogOpen(true);
+                              }}
+                            >
+                              <Edit2 className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-red-600"
+                              onClick={() => handleDelete(activity.id)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
                           </TableCell>
                         </TableRow>
                       ))
@@ -749,7 +723,7 @@ const TaskManagement = () => {
 
         <TabsContent value="projects" className="space-y-4">
           <div className="grid gap-4">
-            {Array.isArray(projects) && projects.length === 0 ? (
+            {projects.length === 0 ? (
               <Card>
                 <CardContent className="text-center py-8">
                   <Calendar className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
@@ -763,37 +737,36 @@ const TaskManagement = () => {
               </Card>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {Array.isArray(projects) &&
-                  projects.map((project) => (
-                    <Card
-                      key={project.id}
-                      className="hover:shadow-lg transition-shadow"
-                    >
-                      <CardHeader>
-                        <CardTitle className="flex items-center justify-between">
-                          {project.name}
-                          <Badge variant="outline">
-                            {project.status || "active"}
-                          </Badge>
-                        </CardTitle>
-                        <CardDescription>
-                          {project.description || "No description"}
-                        </CardDescription>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="flex justify-between items-center">
-                          <span className="text-sm text-muted-foreground">
-                            {
-                              tasks.filter(
-                                (t) => t.project?.name === project.name
-                              ).length
-                            }{" "}
-                            tasks
-                          </span>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
+                {projects.map((project) => (
+                  <Card
+                    key={project.id}
+                    className="hover:shadow-lg transition-shadow"
+                  >
+                    <CardHeader>
+                      <CardTitle className="flex items-center justify-between">
+                        {project.name}
+                        <Badge variant="outline">
+                          {project.status || "active"}
+                        </Badge>
+                      </CardTitle>
+                      <CardDescription>
+                        {project.description || "No description"}
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-muted-foreground">
+                          {
+                            tasks.filter(
+                              (t) => t.project?.name === project.name
+                            ).length
+                          }{" "}
+                          tasks
+                        </span>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
               </div>
             )}
           </div>

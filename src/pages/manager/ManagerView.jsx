@@ -367,6 +367,7 @@ const ManagerView = () => {
           <div className="flex gap-4 items-center p-4 bg-muted/50 rounded-lg flex-wrap">
             <div className="flex items-center gap-2">
               <Filter className="h-4 w-4" />
+              
               <Select value={filterProject} onValueChange={setFilterProject}>
                 <SelectTrigger className="w-48">
                   <SelectValue placeholder="Filter by Project" />

@@ -21,7 +21,6 @@ const EmployeeSidebar = () => {
             <LayoutDashboard className="mr-2 h-5 w-5" /> Dashboard
           </Link>
         </li>
-
         <li>
           <Link
             to="/employee/timesheet"
@@ -32,7 +31,7 @@ const EmployeeSidebar = () => {
         </li>
         <li>
           <Link
-            to="/screenshots"
+            to=""
             className="flex items-center hover:bg-gray-700 p-2 rounded cursor-pointer transition-colors duration-200"
           >
             <Camera className="mr-2 h-5 w-5" /> Screenshots
@@ -40,7 +39,7 @@ const EmployeeSidebar = () => {
         </li>
         <li>
           <Link
-            to="/people"
+            to=""
             className="flex items-center hover:bg-gray-700 p-2 rounded cursor-pointer transition-colors duration-200"
           >
             <Users className="mr-2 h-5 w-5" /> People
@@ -48,7 +47,7 @@ const EmployeeSidebar = () => {
         </li>
         <li>
           <Link
-            to="/projects"
+            to=""
             className="flex items-center hover:bg-gray-700 p-2 rounded cursor-pointer transition-colors duration-200"
           >
             <Settings className="mr-2 h-5 w-5" /> Projects
@@ -56,7 +55,7 @@ const EmployeeSidebar = () => {
         </li>
         <li>
           <Link
-            to="/tasks"
+            to=""
             className="flex items-center hover:bg-gray-700 p-2 rounded cursor-pointer transition-colors duration-200"
           >
             <Clipboard className="mr-2 h-5 w-5" /> Tasks
@@ -64,7 +63,7 @@ const EmployeeSidebar = () => {
         </li>
         <li>
           <Link
-            to="/messages"
+            to=""
             className="flex items-center hover:bg-gray-700 p-2 rounded cursor-pointer transition-colors duration-200"
           >
             <MessageCircle className="mr-2 h-5 w-5" /> Messages
