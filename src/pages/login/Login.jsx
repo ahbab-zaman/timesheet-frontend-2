@@ -11,7 +11,10 @@ import {
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Clock, Users, CheckCircle } from "lucide-react";
-import { useLoginMutation } from "@/redux/features/auth/authApi";
+import {
+  useLoginMutation,
+  useRegisterMutation,
+} from "@/redux/features/auth/authApi";
 import { useDispatch } from "react-redux";
 import { setUser } from "@/redux/features/auth/authSlice";
 import { verifyToken } from "@/utils/verifyToken";
@@ -22,11 +25,16 @@ const Login = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
+  const [employeeId, setEmployeeId] = useState("");
+  const [department, setDepartment] = useState("");
+  const [position, setPosition] = useState("");
+  const [hourlyRate, setHourlyRate] = useState("");
   const [loading, setLoading] = useState(false);
 
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const [login] = useLoginMutation();
+  const [register] = useRegisterMutation();
 
   const handleUserLogin = async (e) => {
     e.preventDefault();
@@ -62,7 +70,45 @@ const Login = () => {
 
   const handleSignUp = async (e) => {
     e.preventDefault();
-    toast.info("Signup feature not implemented yet 🚧");
+    setLoading(true);
+
+    try {
+      const userData = {
+        fullName,
+        email,
+        password,
+        employeeId: employeeId || null,
+        department: department || null,
+        position: position || null,
+        hourlyRate: hourlyRate ? parseFloat(hourlyRate) : null,
+      };
+      const response = await register(userData).unwrap();
+
+      if (response.error) {
+        toast.error(response.error || "Registration failed.");
+        setLoading(false);
+        return;
+      }
+
+      toast.success(
+        "Registration successful! You have been registered as an Employee. You can now log in."
+      );
+
+      // Clear form
+      setFullName("");
+      setEmail("");
+      setPassword("");
+      setEmployeeId("");
+      setDepartment("");
+      setPosition("");
+      setHourlyRate("");
+    } catch (error) {
+      toast.error(
+        error?.data?.error || "Something went wrong during registration!"
+      );
+    } finally {
+      setLoading(false);
+    }
   };
 
   if (loading) {
@@ -188,6 +234,47 @@ const Login = () => {
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="employeeId">Employee ID (optional)</Label>
+                    <Input
+                      id="employeeId"
+                      type="text"
+                      placeholder="Enter your employee ID"
+                      value={employeeId}
+                      onChange={(e) => setEmployeeId(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="department">Department (optional)</Label>
+                    <Input
+                      id="department"
+                      type="text"
+                      placeholder="Enter your department"
+                      value={department}
+                      onChange={(e) => setDepartment(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="position">Position (optional)</Label>
+                    <Input
+                      id="position"
+                      type="text"
+                      placeholder="Enter your position"
+                      value={position}
+                      onChange={(e) => setPosition(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="hourlyRate">Hourly Rate (optional)</Label>
+                    <Input
+                      id="hourlyRate"
+                      type="number"
+                      step="0.01"
+                      placeholder="Enter your hourly rate"
+                      value={hourlyRate}
+                      onChange={(e) => setHourlyRate(e.target.value)}
                     />
                   </div>
                   <Button type="submit" className="w-full" disabled={loading}>

@@ -159,11 +159,6 @@ export default function EmployeeDashboard() {
 
     setIsLoadingTimeEntries(true);
     try {
-      console.log("Fetching time entries with params:", {
-        employee_id: employeeId,
-        week_start: weekStart,
-        week_end: weekEnd,
-      });
       const response = await axiosInstance.get("/api/v1/time/timesheets/week", {
         params: {
           employee_id: employeeId,
@@ -172,11 +167,8 @@ export default function EmployeeDashboard() {
         },
       });
 
-      console.log("Time entries API response:", response.data);
-
       const newEntries = response.data.timeEntries || [];
       if (!Array.isArray(newEntries)) {
-        console.warn("Received non-array time entries:", newEntries);
         setTimeEntries([]);
         return;
       }
@@ -452,7 +444,6 @@ export default function EmployeeDashboard() {
 
     // Debug: Log local week date strings
     const weekDateStrs = weekDates.map((date) => format(date, "yyyy-MM-dd"));
-    console.log("Current week local date strings:", weekDateStrs);
 
     timeEntries.forEach((entry) => {
       if (!entry?.date || !entry?.hours) {
@@ -493,12 +484,6 @@ export default function EmployeeDashboard() {
           ...entry,
           totalSeconds, // Store total seconds for rendering individual entries
         });
-        console.log(
-          `Matched entry ${entry.id} to day ${dayIndex} (${format(
-            weekDates[dayIndex],
-            "EEE, yyyy-MM-dd"
-          )})`
-        );
       } else {
         console.warn(
           `Entry date ${entryDate} does not match any week date:`,
