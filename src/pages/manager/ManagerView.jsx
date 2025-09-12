@@ -76,7 +76,6 @@ const ManagerView = () => {
         // Fetch projects
         const projectResponse = await axiosInstance.get("/api/v1/project");
         const projectData = projectResponse.data.projects || [];
-        console.log("Fetched projects:", projectData);
 
         const formattedProjects = projectData.map((project) => ({
           project_id: project.id,
@@ -209,7 +208,6 @@ const ManagerView = () => {
 
         if (isMounted) {
           setTimesheets(allTimesheets);
-          console.log("All Timesheets", allTimesheets);
         }
       } catch (error) {
         if (isMounted) {

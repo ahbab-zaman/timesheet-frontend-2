@@ -129,7 +129,6 @@ const FinanceDashboard = () => {
     try {
       const response = await axiosInstance.get("api/v1/bank-details/");
       setBankDetails(response.data.bankDetails || []);
-      console.log(response.data.bankDetails);
     } catch (error) {
       console.error("Error fetching bank details:", error);
       toast.error("Failed to load bank details");
@@ -211,7 +210,6 @@ const FinanceDashboard = () => {
     try {
       const response = await axiosInstance.get("api/v1/bonus/");
       setBonuses(response.data.bonuses || []);
-      console.log(response.data.bonuses);
     } catch (error) {
       console.error("Error fetching bonuses:", error);
       toast.error("Failed to load bonuses");
@@ -229,7 +227,6 @@ const FinanceDashboard = () => {
         if (employeesList.length > 0) {
           setCurrentEmployee(employeesList[0]);
         }
-        console.log("Fetched employee data:", employeesList);
       } catch (error) {
         toast.error("Failed to fetch employee details. Please try again.");
         console.error("Error fetching current employee:", error);
@@ -408,11 +405,9 @@ const FinanceDashboard = () => {
         toast.error("Invalid employee ID");
         return;
       }
-      console.log("Releasing payment for employee_id:", summary.employee_id);
       const response = await axiosInstance.post(
         `api/v1/summary/release-payment/${summary.employee_id}`
       );
-      console.log("API Response:", response.data);
       toast.success(`Payment released for ${summary.employee_name}`);
       setFilteredSummary((prevSummary) =>
         prevSummary.map((item) =>

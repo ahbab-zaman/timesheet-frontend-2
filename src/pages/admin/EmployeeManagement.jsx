@@ -114,7 +114,6 @@ const EmployeeManagement = () => {
       );
       toast.success("Employee Updated Successfully");
       resetForm();
-      console.log("Updated employee data", res.data);
       setEditOpen(false);
     } catch (error) {
       console.error("Failed to update employee:", error);

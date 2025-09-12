@@ -101,7 +101,6 @@ export default function EmployeeDashboard() {
         if (isMounted) {
           const employee = response.data.employees[0];
           setCurrentEmployee(employee);
-          console.log("Fetched employee data:", employee);
         }
       } catch (error) {
         if (isMounted) {
@@ -791,11 +790,7 @@ export default function EmployeeDashboard() {
         </Button>
       </div>
 
-      <div className="grid grid-cols-7 text-center font-medium border-b pb-2">
-        {leaveWeekDates.map((date) => (
-          <div key={date.toISOString()}>{format(date, "EEE")}</div>
-        ))}
-      </div>
+      
 
       <Card className="p-6 shadow-lg rounded-lg">
         {isLoadingLeaves ? (

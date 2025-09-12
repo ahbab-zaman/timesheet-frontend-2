@@ -372,8 +372,6 @@ const AdminDashboard = () => {
         description: "Employee updated successfully",
       });
 
-      // Log the updated employee to verify
-      console.log("Updated employee:", updatedEmployee);
     } catch (error) {
       console.error("Error updating employee:", error);
       toast({
@@ -591,7 +589,6 @@ const AdminDashboard = () => {
                 <Select
                   value={projectStatusFilter}
                   onValueChange={(value) => {
-                    console.log("Selected project status:", value); // Debug
                     setTableLoading(true);
                     setProjectStatusFilter(value);
                     setTimeout(() => setTableLoading(false), 500);

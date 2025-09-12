@@ -404,7 +404,6 @@ const ManagerDashboard = () => {
 
         if (isMounted) {
           setTimesheets(allTimesheets);
-          console.log("All Timesheets", allTimesheets);
         }
       } catch (error) {
         if (isMounted) {

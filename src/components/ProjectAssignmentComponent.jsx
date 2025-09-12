@@ -29,7 +29,6 @@ const ProjectAssignment = () => {
     setLoading(true);
     try {
       const projectResponse = await axiosInstance.get("/api/v1/project");
-      console.log("Fetched projects:", projectResponse.data.projects);
       const filteredProjects =
         selectedProject === "all"
           ? projectResponse.data.projects
@@ -41,7 +40,6 @@ const ProjectAssignment = () => {
       const employeeResponse = await axiosInstance.get("/api/v1/employee", {
         params: { search },
       });
-      console.log("Fetched employees:", employeeResponse.data.employees);
       setEmployees(employeeResponse.data.employees || []);
     } catch (error) {
       console.error("Error fetching data:", error);

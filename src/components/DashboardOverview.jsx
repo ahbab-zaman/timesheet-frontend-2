@@ -54,10 +54,10 @@ const DashboardOverview = () => {
     activeEmployees: 45,
     totalProjects: 30,
     activeProjects: 20,
-    totalHoursThisMonth: 3200,
-    averageDailyHours: 6.5,
-    approvedTimesheets: 180,
-    pendingTimesheets: 20,
+    totalHoursThisMonth: 0,
+    averageDailyHours: 0,
+    approvedTimesheets: 0,
+    rejectedTimesheets: 0,
     totalRevenue: 125000,
     billableHours: 2560,
     employeeUtilization: 85,
@@ -69,30 +69,80 @@ const DashboardOverview = () => {
     { name: "Active", value: 20, color: COLORS[0] },
     { name: "Completed", value: 8, color: COLORS[1] },
     { name: "On Hold", value: 2, color: COLORS[2] },
-    { name: "Cancelled", value: 0, color: COLORS[3] }, // Added Cancelled with initial value 0
+    { name: "Cancelled", value: 0, color: COLORS[3] },
   ]);
+
+  const [timesheetDays, setTimesheetDays] = useState([]);
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [dateRange]);
 
   const fetchData = async () => {
     try {
       setLoading(true);
-      const projectResponse = await axiosInstance.get("/api/v1/project");
-      console.log("Fetched projects:", projectResponse.data.projects);
+      // Fetch timesheets
+      const timesheetResponse = await axiosInstance.get(
+        "/api/v1/time/timesheets/all"
+      );
+      const timesheets = timesheetResponse.data || [];
 
-      // Aggregate projects by status
+      // Calculate metrics for the selected date range
+      const startDate = dateRange.from;
+      const endDate = dateRange.to;
+      let totalHours = 0;
+      let approvedCount = 0;
+      let rejectedCount = 0;
+      const daysInRange =
+        Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24)) || 1;
+
+      // Track days with timesheet activity
+      const dayMap = {};
+      timesheets.forEach((timesheet) => {
+        const weekStart = new Date(timesheet.week_start_date);
+        const weekEnd = new Date(timesheet.week_end_date);
+        if (weekStart <= endDate && weekEnd >= startDate) {
+          totalHours += parseFloat(timesheet.total_hours) || 0;
+          if (timesheet.status === "approved") approvedCount++;
+          if (timesheet.status === "rejected") rejectedCount++;
+
+          // Mark days in the timesheet's week as active
+          for (
+            let d = new Date(weekStart);
+            d <= weekEnd && d <= endDate;
+            d.setDate(d.getDate() + 1)
+          ) {
+            if (d >= startDate) {
+              const dayKey = format(d, "yyyy-MM-dd");
+              dayMap[dayKey] = true;
+            }
+          }
+        }
+      });
+
+      // Create array of active days for calendar display
+      const activeDays = Object.keys(dayMap).map((date) => new Date(date));
+
+      setMetrics((prev) => ({
+        ...prev,
+        totalHoursThisMonth: totalHours.toFixed(2),
+        averageDailyHours: (totalHours / daysInRange).toFixed(1),
+        approvedTimesheets: approvedCount,
+        rejectedTimesheets: rejectedCount,
+      }));
+      setTimesheetDays(activeDays);
+
+      // Fetch project data
+      const projectResponse = await axiosInstance.get("/api/v1/project");
       const statusCounts = projectResponse.data.projects.reduce(
         (acc, project) => {
           const status = project.status || "Unknown";
           acc[status] = (acc[status] || 0) + 1;
           return acc;
         },
-        { Active: 0, Completed: 0, "On Hold": 0, Cancelled: 0 } // Initialize all statuses
+        { Active: 0, Completed: 0, "On Hold": 0, Cancelled: 0 }
       );
 
-      // Transform aggregated data into projectStats format
       const transformedProjects = Object.entries(statusCounts).map(
         ([status, count], index) => ({
           name: status,
@@ -110,7 +160,7 @@ const DashboardOverview = () => {
       console.error("Error fetching data:", error);
       toast({
         title: "Error",
-        description: "Failed to load project data",
+        description: "Failed to load data",
         variant: "destructive",
       });
     } finally {
@@ -129,13 +179,6 @@ const DashboardOverview = () => {
     { month: "Aug", revenue: 125000, hours: 3200 },
     { month: "Sep", revenue: 115000, hours: 3000 },
   ]);
-
-  useEffect(() => {
-    // Simulate data loading
-    setTimeout(() => {
-      setLoading(false);
-    }, 1000);
-  }, [dateRange]);
 
   if (loading) {
     return (
@@ -229,19 +272,28 @@ const DashboardOverview = () => {
                   {day}
                 </div>
               ))}
-              {[...Array(31)].map((_, i) => (
-                <div
-                  key={i}
-                  className={`aspect-square rounded text-xs flex items-center justify-center
-                     ${
-                       i < new Date().getDate()
-                         ? "bg-chart-2/30 text-chart-2 font-medium"
-                         : "text-muted-foreground"
-                     }`}
-                >
-                  {i + 1}
-                </div>
-              ))}
+              {[...Array(31)].map((_, i) => {
+                const currentDate = new Date(dateRange.from);
+                currentDate.setDate(currentDate.getDate() + i);
+                const isActive = timesheetDays.some(
+                  (d) =>
+                    format(d, "yyyy-MM-dd") ===
+                    format(currentDate, "yyyy-MM-dd")
+                );
+                return (
+                  <div
+                    key={i}
+                    className={`aspect-square rounded text-xs flex items-center justify-center
+                      ${
+                        isActive && currentDate <= dateRange.to
+                          ? "bg-chart-2/30 text-chart-2 font-medium"
+                          : "text-muted-foreground"
+                      }`}
+                  >
+                    {i + 1}
+                  </div>
+                );
+              })}
             </div>
             <div className="grid grid-cols-2 gap-4 pt-4 border-t">
               <div className="text-center">
@@ -271,15 +323,16 @@ const DashboardOverview = () => {
               </Badge>
               <Badge
                 variant={
-                  metrics.pendingTimesheets > 5 ? "destructive" : "outline"
+                  metrics.rejectedTimesheets > 0 ? "destructive" : "outline"
                 }
               >
-                {metrics.pendingTimesheets} Pending
+                {metrics.rejectedTimesheets} Rejected
               </Badge>
             </div>
           </CardContent>
         </Card>
 
+        {/* Projects Section */}
         <Card className="bg-gradient-to-br from-chart-3/10 to-chart-3/5 border-chart-3/20 shadow-lg">
           <CardHeader className="pb-3">
             <CardTitle className="text-lg font-semibold flex items-center gap-2">

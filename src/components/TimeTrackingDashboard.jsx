@@ -74,7 +74,6 @@ const TimeTrackingDashboard = () => {
     try {
       setLoading(true);
       const projectResponse = await axiosInstance.get("/api/v1/project");
-      console.log("Fetched projects:", projectResponse.data.projects);
 
       // Filter projects by selectedProject if not "all"
       const filteredProjects =

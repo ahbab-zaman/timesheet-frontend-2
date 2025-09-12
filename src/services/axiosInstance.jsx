@@ -12,9 +12,6 @@ const axiosInstance = axios.create({
   },
 });
 
-// Log baseURL for debugging
-console.log("Axios baseURL:", axiosInstance.defaults.baseURL);
-
 // Add token from localStorage to every request
 axiosInstance.interceptors.request.use(
   (config) => {

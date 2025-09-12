@@ -52,7 +52,6 @@ const TimeTracker = ({
     const fetchProjects = async () => {
       try {
         const response = await axiosInstance.get("/api/v1/project");
-        console.log("Projects response:", response.data);
         setProjects(response?.data.projects || []);
       } catch (error) {
         console.error("Failed to fetch projects:", error);
@@ -69,7 +68,6 @@ const TimeTracker = ({
           const response = await axiosInstance.get(`/api/v1/task`, {
             params: { project_id: selectedProject },
           });
-          console.log("Tasks response:", response.data);
           setTasks(response.data.tasks || []);
           setSelectedTask("");
         } catch (error) {
@@ -119,21 +117,12 @@ const TimeTracker = ({
     }
     try {
       const localDate = getLocalDateString();
-      console.log("Sending local date for clock-in:", localDate);
       const response = await axiosInstance.post("/api/v1/time/clock-in", {
         project_id: selectedProject,
         employee_id: employeeId,
         task_id: selectedTask,
         description,
         date: localDate,
-      });
-      console.log("Clock-in response:", response.data);
-      setActiveSession({
-        ...response.data,
-        project_id: selectedProject,
-        task_id: selectedTask,
-        description,
-        start_time: new Date().toISOString(),
       });
       setIsRunning(true);
       setElapsedSeconds(0);
@@ -170,14 +159,12 @@ const TimeTracker = ({
     }
     try {
       const localDate = getLocalDateString();
-      console.log("Sending local date for clock-out:", localDate);
       const response = await axiosInstance.post(
         `/api/v1/time/clock-out/${activeSession.id}`,
         {
           date: localDate,
         }
       );
-      console.log("Clock-out response:", response.data);
       toast.success(`Time logged: ${formatTime(elapsedSeconds)}`);
       setActiveSession(null);
       setIsRunning(false);
