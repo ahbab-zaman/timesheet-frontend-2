@@ -23,6 +23,7 @@ const TimeTracker = ({
   setTimeEntries,
   refreshTimeEntries,
   currentEmployee,
+  refreshTimesheets, // Added prop
 }) => {
   const [isRunning, setIsRunning] = useState(false);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
@@ -48,6 +49,7 @@ const TimeTracker = ({
     return `${year}-${month}-${day}`;
   };
 
+  // Fetch projects on mount
   useEffect(() => {
     const fetchProjects = async () => {
       try {
@@ -61,6 +63,7 @@ const TimeTracker = ({
     fetchProjects();
   }, []);
 
+  // Fetch tasks when selectedProject changes
   useEffect(() => {
     const fetchTasks = async () => {
       if (selectedProject) {
@@ -82,6 +85,40 @@ const TimeTracker = ({
     fetchTasks();
   }, [selectedProject]);
 
+  // Check for active session on mount
+  useEffect(() => {
+    const checkActiveSession = async () => {
+      if (!employeeId) return;
+      try {
+        const response = await axiosInstance.get(
+          "/api/v1/time/active-session",
+          {
+            params: { employee_id: employeeId },
+          }
+        );
+        const session = response.data?.activeSession;
+        if (session) {
+          setActiveSession(session);
+          setSelectedProject(session.project_id);
+          setSelectedTask(session.task_id);
+          setDescription(session.description || "");
+          setIsRunning(true);
+          startTimeRef.current = new Date(session.start_time);
+          const currentTime = new Date();
+          const elapsed = Math.floor(
+            (currentTime.getTime() - new Date(session.start_time).getTime()) /
+              1000
+          );
+          setElapsedSeconds(elapsed);
+        }
+      } catch (error) {
+        console.error("Failed to fetch active session:", error);
+      }
+    };
+    checkActiveSession();
+  }, [employeeId]);
+
+  // Timer logic
   useEffect(() => {
     if (isRunning) {
       intervalRef.current = setInterval(() => {
@@ -124,6 +161,9 @@ const TimeTracker = ({
         description,
         date: localDate,
       });
+
+      const newEntry = response.data?.timeEntry || response.data;
+      setActiveSession(newEntry);
       setIsRunning(true);
       setElapsedSeconds(0);
       startTimeRef.current = new Date();
@@ -152,19 +192,19 @@ const TimeTracker = ({
   };
 
   const stopTimer = async () => {
-    if (!activeSession) return;
+    if (!activeSession) {
+      toast.error("No active session to stop.");
+      return;
+    }
     if (elapsedSeconds < 60) {
       toast.error("You cannot stop the timer until one minute has elapsed.");
       return;
     }
     try {
       const localDate = getLocalDateString();
-      const response = await axiosInstance.post(
-        `/api/v1/time/clock-out/${activeSession.id}`,
-        {
-          date: localDate,
-        }
-      );
+      await axiosInstance.post(`/api/v1/time/clock-out/${activeSession.id}`, {
+        date: localDate,
+      });
       toast.success(`Time logged: ${formatTime(elapsedSeconds)}`);
       setActiveSession(null);
       setIsRunning(false);
@@ -173,6 +213,9 @@ const TimeTracker = ({
       setSelectedProject("");
       setSelectedTask("");
       refreshTimeEntries();
+      if (refreshTimesheets) {
+        await refreshTimesheets(); // Trigger timesheet refresh
+      }
     } catch (error) {
       console.error("Failed to stop timer:", error.response || error);
       toast.error(
@@ -239,7 +282,7 @@ const TimeTracker = ({
                   <Select
                     value={selectedProject}
                     onValueChange={setSelectedProject}
-                    disabled={isRunning}
+                    disabled={isRunning || activeSession}
                   >
                     <SelectTrigger className="w-full border-gray-300">
                       <SelectValue placeholder="Select project" />
@@ -265,7 +308,7 @@ const TimeTracker = ({
                   <Select
                     value={selectedTask}
                     onValueChange={setSelectedTask}
-                    disabled={isRunning || !selectedProject}
+                    disabled={isRunning || activeSession || !selectedProject}
                   >
                     <SelectTrigger className="w-full border-gray-300">
                       <SelectValue placeholder="Select task" />
@@ -292,13 +335,13 @@ const TimeTracker = ({
                     placeholder="What are you working on?"
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
-                    disabled={isRunning}
+                    disabled={isRunning || activeSession}
                     className="border-gray-300 focus:ring-blue-500"
                   />
                 </div>
 
                 <div className="flex gap-2 justify-center pt-4">
-                  {!activeSession ? (
+                  {!activeSession && !isRunning ? (
                     <Button
                       onClick={startTimer}
                       className="flex items-center gap-2 bg-blue-600 text-white hover:bg-blue-700"
@@ -331,7 +374,7 @@ const TimeTracker = ({
                         onClick={stopTimer}
                         variant="destructive"
                         className="flex items-center gap-2 bg-red-600 text-white hover:bg-red-700"
-                        disabled={!activeSession}
+                        disabled={!activeSession || elapsedSeconds < 60}
                       >
                         <Square className="h-4 w-4" />
                         Stop

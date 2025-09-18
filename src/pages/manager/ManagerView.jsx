@@ -338,7 +338,7 @@ const ManagerView = () => {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold">
-            Manager Dashboard - Enhanced View
+            Client Dashboard - Enhanced View
           </h2>
           <p className="text-muted-foreground">
             Comprehensive timesheet and team management
@@ -365,7 +365,7 @@ const ManagerView = () => {
           <div className="flex gap-4 items-center p-4 bg-muted/50 rounded-lg flex-wrap">
             <div className="flex items-center gap-2">
               <Filter className="h-4 w-4" />
-              
+
               <Select value={filterProject} onValueChange={setFilterProject}>
                 <SelectTrigger className="w-48">
                   <SelectValue placeholder="Filter by Project" />

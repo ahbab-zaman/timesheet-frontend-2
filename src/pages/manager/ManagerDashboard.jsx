@@ -195,7 +195,8 @@ const WeeklyTimesheet = ({ timesheet }) => {
   );
 };
 
-const ManagerDashboard = () => {
+const ManagerDashboard = ({ refreshTimesheetsCallback }) => {
+  // Added prop
   const navigate = useNavigate();
   const [timesheets, setTimesheets] = useState([]);
   const [employees, setEmployees] = useState([]);
@@ -219,6 +220,39 @@ const ManagerDashboard = () => {
     startOfWeek(new Date(), { weekStartsOn: 1 })
   );
   const dispatch = useDispatch();
+
+  // Expose refresh function
+  const refreshTimesheets = async () => {
+    setLoading(true);
+    try {
+      const response = await axiosInstance.get("/api/v1/time/timesheets/all", {
+        params: {
+          week_start: format(dateRange.start, "yyyy-MM-dd"),
+          week_end: format(dateRange.end, "yyyy-MM-dd"),
+          status: filter === "all" ? undefined : filter,
+        },
+      });
+
+      const allTimesheets = Array.isArray(response.data)
+        ? response.data.map((timesheet) => ({
+            ...timesheet,
+            employees: {
+              id: timesheet.employee?.id || timesheet.employee_id || "Unknown",
+              name: timesheet.employee?.name || "Unknown",
+              email: timesheet.employee?.email || "Unknown",
+            },
+            entries: timesheet.entries || [],
+          }))
+        : [];
+
+      setTimesheets(allTimesheets);
+    } catch (error) {
+      toast.error("Failed to fetch timesheets. Please try again.");
+      console.error("Error fetching timesheets:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleQuickFilter = (value) => {
     setQuickFilter(value);
@@ -307,6 +341,7 @@ const ManagerDashboard = () => {
         )
       );
       toast.success("Timesheet submitted successfully!");
+      await refreshTimesheets(); // Refresh after submission
     } catch (error) {
       toast.error("Failed to submit timesheet. Please try again.");
       console.error("Error submitting timesheet:", error);
@@ -375,52 +410,10 @@ const ManagerDashboard = () => {
       }
     };
 
-    const fetchTimesheets = async () => {
-      setLoading(true);
-      try {
-        const response = await axiosInstance.get(
-          "/api/v1/time/timesheets/all",
-          {
-            params: {
-              week_start: format(dateRange.start, "yyyy-MM-dd"),
-              week_end: format(dateRange.end, "yyyy-MM-dd"),
-              status: filter === "all" ? undefined : filter,
-            },
-          }
-        );
-
-        const allTimesheets = Array.isArray(response.data)
-          ? response.data.map((timesheet) => ({
-              ...timesheet,
-              employees: {
-                id:
-                  timesheet.employee?.id || timesheet.employee_id || "Unknown",
-                name: timesheet.employee?.name || "Unknown",
-                email: timesheet.employee?.email || "Unknown",
-              },
-              entries: timesheet.entries || [],
-            }))
-          : [];
-
-        if (isMounted) {
-          setTimesheets(allTimesheets);
-        }
-      } catch (error) {
-        if (isMounted) {
-          toast.error("Failed to fetch timesheets. Please try again.");
-          console.error("Error fetching timesheets:", error);
-        }
-      } finally {
-        if (isMounted) {
-          setLoading(false);
-        }
-      }
-    };
-
     const initializeData = async () => {
       await fetchCurrentUser();
       await fetchEmployees();
-      await fetchTimesheets();
+      await refreshTimesheets(); // Use refreshTimesheets
     };
 
     initializeData();
@@ -429,6 +422,13 @@ const ManagerDashboard = () => {
       isMounted = false;
     };
   }, [filter, dateRange]);
+
+  // Expose refreshTimesheets to parent via callback
+  useEffect(() => {
+    if (refreshTimesheetsCallback) {
+      refreshTimesheetsCallback(refreshTimesheets);
+    }
+  }, [refreshTimesheetsCallback]);
 
   const weekDates = Array.from({ length: 7 }, (_, i) =>
     addDays(currentWeekStart, i)
@@ -455,10 +455,10 @@ const ManagerDashboard = () => {
             </div>
             <div>
               <h1 className="text-xl sm:text-2xl font-bold">
-                {userRole === "admin" ? "Admin Dashboard" : "Manager Dashboard"}
+                {userRole === "admin" ? "Admin Dashboard" : "Client Dashboard"}
               </h1>
               <p className="text-gray-600 text-sm">
-                Manager's review helps keep project hours aligned ✅
+                Client's review helps keep project hours aligned ✅
               </p>
             </div>
           </div>
@@ -502,7 +502,7 @@ const ManagerDashboard = () => {
                 className="text-sm"
               >
                 <BarChart3 className="h-4 w-4 mr-2" />
-                Enhanced Manager View
+                Enhanced Client View
               </Button>
               <Button
                 variant={activeTab === "tasks" ? "default" : "outline"}

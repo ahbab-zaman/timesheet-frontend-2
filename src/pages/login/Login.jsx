@@ -148,16 +148,11 @@ const Login = () => {
               {/* ✅ Sample credentials for testing */}
               <div className="text-xs text-muted-foreground mt-3 space-y-1">
                 <div>
-                  <strong>Admin:</strong> admin@test.com / admin123
+                  <strong>Client:</strong> client@test.com / client123
                 </div>
                 <div>
-                  <strong>Manager:</strong> manager@test.com / manager123
-                </div>
-                <div>
-                  <strong>Employee:</strong> employee@test.com / employee123
-                </div>
-                <div>
-                  <strong>Finance:</strong> finance@test.com / finance123
+                  <strong>Freelancer:</strong> freelancer@test.com /
+                  freelancer123
                 </div>
               </div>
             </CardDescription>

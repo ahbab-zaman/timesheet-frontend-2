@@ -514,7 +514,7 @@ export default function EmployeeDashboard() {
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-gray-100 p-6 space-y-4">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center">
         <div className="flex items-center gap-2 mb-4 sm:mb-0">
-          <Link to="/employee/dashboard">
+          <Link to="/freelancer/dashboard">
             <Button variant="outline">
               <ArrowLeft className="h-4 w-4 mr-2" />
               Back to Dashboard
@@ -789,8 +789,6 @@ export default function EmployeeDashboard() {
           <ChevronRight className="h-4 w-4 ml-2" />
         </Button>
       </div>
-
-      
 
       <Card className="p-6 shadow-lg rounded-lg">
         {isLoadingLeaves ? (

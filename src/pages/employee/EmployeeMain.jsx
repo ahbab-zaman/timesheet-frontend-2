@@ -32,16 +32,18 @@ const EmployeeMain = () => {
               </AvatarFallback>
             </Avatar>
             <div>
-              <h2 className="text-xl font-bold text-gray-800">Employee User</h2>
+              <h2 className="text-xl font-bold text-gray-800">
+                Freelancer User
+              </h2>
               <p className="text-md text-gray-600 font-medium">
                 Software Developer
               </p>
             </div>
           </div>
-            <Button variant="outline" onClick={handleLogout}>
-              <LogOut />
-              Sign Out
-            </Button>
+          <Button variant="outline" onClick={handleLogout}>
+            <LogOut />
+            Sign Out
+          </Button>
         </div>
         <div className="grid grid-cols-4 gap-6">
           <Card className="hover:shadow-lg transition-shadow duration-300 bg-gradient-to-br from-white to-gray-50">
