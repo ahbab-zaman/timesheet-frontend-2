@@ -29,6 +29,7 @@ const Login = () => {
   const [department, setDepartment] = useState("");
   const [position, setPosition] = useState("");
   const [hourlyRate, setHourlyRate] = useState("");
+  const [contactNumber, setContactNumber] = useState(""); // Added contact number state
   const [loading, setLoading] = useState(false);
 
   const navigate = useNavigate();
@@ -81,6 +82,7 @@ const Login = () => {
         department: department || null,
         position: position || null,
         hourlyRate: hourlyRate ? parseFloat(hourlyRate) : null,
+        contactNumber: contactNumber || null, // Added contact number to userData
       };
       const response = await register(userData).unwrap();
 
@@ -102,6 +104,7 @@ const Login = () => {
       setDepartment("");
       setPosition("");
       setHourlyRate("");
+      setContactNumber(""); // Clear contact number
     } catch (error) {
       toast.error(
         error?.data?.error || "Something went wrong during registration!"
@@ -209,6 +212,7 @@ const Login = () => {
                       required
                     />
                   </div>
+
                   <div className="space-y-2">
                     <Label htmlFor="email">Email</Label>
                     <Input
@@ -220,6 +224,7 @@ const Login = () => {
                       required
                     />
                   </div>
+
                   <div className="space-y-2">
                     <Label htmlFor="password">Password</Label>
                     <Input
@@ -231,16 +236,31 @@ const Login = () => {
                       required
                     />
                   </div>
+
                   <div className="space-y-2">
-                    <Label htmlFor="employeeId">Employee ID (optional)</Label>
+                    <Label htmlFor="contactNumber">
+                      Contact Number (optional)
+                    </Label>
+                    <Input
+                      id="contactNumber"
+                      type="tel"
+                      placeholder="Enter your contact number"
+                      value={contactNumber}
+                      onChange={(e) => setContactNumber(e.target.value)}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="employeeId">Freelancer ID (optional)</Label>
                     <Input
                       id="employeeId"
                       type="text"
-                      placeholder="Enter your employee ID"
+                      placeholder="Enter your freelancer ID"
                       value={employeeId}
                       onChange={(e) => setEmployeeId(e.target.value)}
                     />
                   </div>
+
                   <div className="space-y-2">
                     <Label htmlFor="department">Department (optional)</Label>
                     <Input
@@ -251,6 +271,7 @@ const Login = () => {
                       onChange={(e) => setDepartment(e.target.value)}
                     />
                   </div>
+
                   <div className="space-y-2">
                     <Label htmlFor="position">Position (optional)</Label>
                     <Input
@@ -261,6 +282,7 @@ const Login = () => {
                       onChange={(e) => setPosition(e.target.value)}
                     />
                   </div>
+
                   <div className="space-y-2">
                     <Label htmlFor="hourlyRate">Hourly Rate (optional)</Label>
                     <Input
@@ -272,6 +294,7 @@ const Login = () => {
                       onChange={(e) => setHourlyRate(e.target.value)}
                     />
                   </div>
+
                   <Button type="submit" className="w-full" disabled={loading}>
                     {loading ? "Creating account..." : "Sign Up"}
                   </Button>
