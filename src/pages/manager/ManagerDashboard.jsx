@@ -102,10 +102,11 @@ const WeeklyTimesheet = ({ timesheet }) => {
     return {
       dailyTotals: dailyTotals.map((hours) => Number(hours.toFixed(2))),
       dailyEntries,
+      totalHours: dailyTotals.reduce((sum, hours) => sum + hours, 0), // Added total calculation
     };
   };
 
-  const { dailyTotals, dailyEntries } = calculateDailyTotals();
+  const { dailyTotals, dailyEntries, totalHours } = calculateDailyTotals(); // Added totalHours
   const [isTimesheetOpen, setIsTimesheetOpen] = useState(false);
 
   return (
@@ -242,6 +243,11 @@ const ManagerDashboard = ({ refreshTimesheetsCallback }) => {
               email: timesheet.employee?.email || "Unknown",
             },
             entries: timesheet.entries || [],
+            displayedTotal: timesheet.entries.reduce(
+              // Added displayedTotal for safety
+              (sum, entry) => sum + (Number(entry.hours) || 0),
+              0
+            ),
           }))
         : [];
 
@@ -665,6 +671,17 @@ const ManagerDashboard = ({ refreshTimesheetsCallback }) => {
                             className="ml-2 h-5 w-5 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                           />
                         </div>
+                        <div className="flex items-center justify-between">
+                          <label className="block text-sm font-medium text-gray-700">
+                            Auto-create Periods
+                          </label>
+                          <input
+                            type="checkbox"
+                            checked={autoCreate}
+                            onChange={(e) => setAutoCreate(e.target.checked)}
+                            className="ml-2 h-5 w-5 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                          />
+                        </div>
                         <div className="border-t pt-4">
                           <h3 className="text-sm font-medium text-gray-700">
                             🕒 Department Overview
@@ -740,6 +757,8 @@ const ManagerDashboard = ({ refreshTimesheetsCallback }) => {
               ) : (
                 filteredTimesheets.map((timesheet) => {
                   const isExpanded = expandedTimesheets[timesheet.id];
+                  const displayTotal =
+                    timesheet.displayedTotal || timesheet.total_hours; // Use calculated if available
                   return (
                     <Card key={timesheet.id} className="overflow-hidden">
                       <div
@@ -780,9 +799,9 @@ const ManagerDashboard = ({ refreshTimesheetsCallback }) => {
                           {getStatusBadge(timesheet.status)}
                           <div className="text-right">
                             <div className="text-lg font-bold bg-gradient-to-r from-blue-500 to-indigo-500 text-white px-3 py-1 rounded-full inline-block">
-                              {formatTime(timesheet.total_hours).hours}h{" "}
-                              {formatTime(timesheet.total_hours).minutes}m{" "}
-                              {formatTime(timesheet.total_hours).seconds}s
+                              {formatTime(displayTotal).hours}h{" "}
+                              {formatTime(displayTotal).minutes}m{" "}
+                              {formatTime(displayTotal).seconds}s
                             </div>
                             <div className="text-xs text-gray-500">
                               {format(
