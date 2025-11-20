@@ -9,13 +9,22 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { Play, Pause, Square, Clock, ChevronDown } from "lucide-react";
+import { Play, Pause, Square, Clock, ChevronDown, Plus } from "lucide-react";
 import { toast } from "sonner";
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import {
+  Dialog,
+  DialogTrigger,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import axiosInstance from "../../services/axiosInstance";
 
 const TimeTracker = ({
@@ -23,17 +32,30 @@ const TimeTracker = ({
   setTimeEntries,
   refreshTimeEntries,
   currentEmployee,
-  refreshTimesheets, // Added prop
+  refreshTimesheets, // Optional prop
 }) => {
   const [isRunning, setIsRunning] = useState(false);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
-  const [isOpen, setIsOpen] = useState(false);
+  const [isOpen, setIsOpen] = useState(true);
   const [projects, setProjects] = useState([]);
   const [tasks, setTasks] = useState([]);
   const [selectedProject, setSelectedProject] = useState("");
   const [selectedTask, setSelectedTask] = useState("");
   const [description, setDescription] = useState("");
   const [activeSession, setActiveSession] = useState(null);
+  const [isManualModalOpen, setIsManualModalOpen] = useState(false);
+
+  // Manual entry states
+  const [manualDate, setManualDate] = useState(
+    new Date().toISOString().slice(0, 10)
+  );
+  const [manualProject, setManualProject] = useState("");
+  const [manualTasks, setManualTasks] = useState([]);
+  const [manualTask, setManualTask] = useState("");
+  const [manualDescription, setManualDescription] = useState("");
+  const [manualHours, setManualHours] = useState(0);
+  const [manualMinutes, setManualMinutes] = useState(0);
+  const [isManualSubmitting, setIsManualSubmitting] = useState(false);
 
   const intervalRef = useRef(null);
   const startTimeRef = useRef(null);
@@ -63,7 +85,7 @@ const TimeTracker = ({
     fetchProjects();
   }, []);
 
-  // Fetch tasks when selectedProject changes
+  // Fetch tasks for auto timer
   useEffect(() => {
     const fetchTasks = async () => {
       if (selectedProject) {
@@ -84,6 +106,28 @@ const TimeTracker = ({
     };
     fetchTasks();
   }, [selectedProject]);
+
+  // Fetch tasks for manual entry
+  useEffect(() => {
+    const fetchManualTasks = async () => {
+      if (manualProject) {
+        try {
+          const response = await axiosInstance.get(`/api/v1/task`, {
+            params: { project_id: manualProject },
+          });
+          setManualTasks(response.data.tasks || []);
+          setManualTask("");
+        } catch (error) {
+          console.error("Failed to fetch manual tasks:", error);
+          toast.error("Failed to load tasks for manual entry");
+        }
+      } else {
+        setManualTasks([]);
+        setManualTask("");
+      }
+    };
+    fetchManualTasks();
+  }, [manualProject]);
 
   // Check for active session on mount
   useEffect(() => {
@@ -214,7 +258,7 @@ const TimeTracker = ({
       setSelectedTask("");
       refreshTimeEntries();
       if (refreshTimesheets) {
-        await refreshTimesheets(); // Trigger timesheet refresh
+        await refreshTimesheets();
       }
     } catch (error) {
       console.error("Failed to stop timer:", error.response || error);
@@ -222,6 +266,61 @@ const TimeTracker = ({
         "Failed to stop timer: " +
           (error.response?.data?.error || error.message)
       );
+    }
+  };
+
+  // Manual entry submit
+  const handleManualSubmit = async () => {
+    if (
+      !manualProject ||
+      !manualTask ||
+      manualHours < 0 ||
+      manualMinutes < 0 ||
+      (manualHours === 0 && manualMinutes === 0)
+    ) {
+      toast.error(
+        "Please select project, task, and enter valid time (at least 1 minute)."
+      );
+      return;
+    }
+    if (manualMinutes >= 60) {
+      toast.error("Minutes must be less than 60.");
+      return;
+    }
+    if (!employeeId) {
+      toast.error("Employee ID not available.");
+      return;
+    }
+    setIsManualSubmitting(true);
+    try {
+      const totalHours = parseInt(manualHours) + parseInt(manualMinutes) / 60;
+      const response = await axiosInstance.post("/api/v1/time/manual-entry", {
+        project_id: manualProject,
+        employee_id: employeeId,
+        task_id: manualTask,
+        description: manualDescription,
+        date: manualDate,
+        hours: totalHours.toFixed(2),
+      });
+      toast.success("Manual time added successfully");
+      // Clear manual fields
+      setManualProject("");
+      setManualTask("");
+      setManualDescription("");
+      setManualHours(0);
+      setManualMinutes(0);
+      setManualDate(new Date().toISOString().slice(0, 10));
+      setIsManualModalOpen(false);
+      refreshTimeEntries();
+      if (refreshTimesheets) await refreshTimesheets();
+    } catch (error) {
+      console.error("Failed to add manual time:", error);
+      toast.error(
+        "Failed to add manual time: " +
+          (error.response?.data?.error || error.message)
+      );
+    } finally {
+      setIsManualSubmitting(false);
     }
   };
 
@@ -248,6 +347,7 @@ const TimeTracker = ({
                 Time Tracker
               </h3>
             </div>
+
             <ChevronDown
               className={`h-5 w-5 text-gray-600 transition-transform duration-200 ${
                 isOpen ? "rotate-180" : "rotate-0"
@@ -263,6 +363,136 @@ const TimeTracker = ({
             }`}
           >
             <CardContent className="p-6 bg-gray-50">
+              {/* Manual Time Entry Button */}
+              <div className="flex justify-center my-4">
+                <Dialog
+                  open={isManualModalOpen}
+                  onOpenChange={setIsManualModalOpen}
+                >
+                  <DialogTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className="flex items-center gap-2"
+                    >
+                      <Plus className="h-4 w-4" />
+                      Add Manual Time
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                      <DialogTitle>Manual Time Entry</DialogTitle>
+                      <DialogDescription>
+                        Fill in the details for your manual time entry.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4">
+                      <div>
+                        <label className="text-sm font-medium mb-2 block text-gray-700">
+                          Date
+                        </label>
+                        <Input
+                          type="date"
+                          value={manualDate}
+                          onChange={(e) => setManualDate(e.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium mb-2 block text-gray-700">
+                          Project
+                        </label>
+                        <Select
+                          value={manualProject}
+                          onValueChange={setManualProject}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select project" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {projects.map((project) => (
+                              <SelectItem key={project.id} value={project.id}>
+                                {project.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium mb-2 block text-gray-700">
+                          Task
+                        </label>
+                        <Select
+                          value={manualTask}
+                          onValueChange={setManualTask}
+                          disabled={!manualProject}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select task" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {manualTasks.map((task) => (
+                              <SelectItem key={task.id} value={task.id}>
+                                {task.title || task.task_title}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium mb-2 block text-gray-700">
+                          Description
+                        </label>
+                        <Input
+                          placeholder="Description of work"
+                          value={manualDescription}
+                          onChange={(e) => setManualDescription(e.target.value)}
+                        />
+                      </div>
+                      <div className="flex gap-4">
+                        <div className="w-1/2">
+                          <label className="text-sm font-medium mb-2 block text-gray-700">
+                            Hours
+                          </label>
+                          <Input
+                            type="number"
+                            min="0"
+                            value={manualHours}
+                            onChange={(e) => setManualHours(e.target.value)}
+                          />
+                        </div>
+                        <div className="w-1/2">
+                          <label className="text-sm font-medium mb-2 block text-gray-700">
+                            Minutes
+                          </label>
+                          <Input
+                            type="number"
+                            min="0"
+                            max="59"
+                            value={manualMinutes}
+                            onChange={(e) => setManualMinutes(e.target.value)}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                    <DialogFooter>
+                      <Button
+                        variant="outline"
+                        onClick={() => setIsManualModalOpen(false)}
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        onClick={handleManualSubmit}
+                        disabled={isManualSubmitting}
+                        className="bg-green-600 text-white hover:bg-green-700"
+                      >
+                        {isManualSubmitting ? "Adding..." : "Add Manual Time"}
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+              </div>
+
+              {/* Auto Timer Section */}
               <div className="text-center mb-6">
                 <div className="text-3xl font-mono font-bold text-blue-600 bg-white p-3 rounded-lg shadow-md">
                   {formatTime(elapsedSeconds)}
@@ -344,7 +574,7 @@ const TimeTracker = ({
                   {!activeSession && !isRunning ? (
                     <Button
                       onClick={startTimer}
-                      className="flex items-center gap-2 bg-blue-600 text-white hover:bg-blue-700"
+                      className="flex items-center gap-2 bg-[#878B94] text-white"
                       disabled={!selectedProject || !selectedTask}
                     >
                       <Play className="h-4 w-4" />

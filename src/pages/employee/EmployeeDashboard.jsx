@@ -1,16 +1,15 @@
-import { useState, useEffect } from "react";
-import { format, addDays, startOfWeek, endOfWeek } from "date-fns";
+import { useState, useEffect, useMemo } from "react";
+import { format, addDays, startOfWeek, endOfWeek, parse } from "date-fns";
 import {
   CalendarIcon,
   ChevronLeft,
   ChevronRight,
   Filter,
   Search,
-  Edit,
-  Trash2,
   Loader2,
   ArrowLeft,
   Clock,
+  ChevronDown,
 } from "lucide-react";
 import {
   Popover,
@@ -28,16 +27,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Dialog,
-  DialogTrigger,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from "@/components/ui/dialog";
-import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import TimeTracker from "./TimeTracker";
 import EmployeeNotification from "./EmployeeNotification";
@@ -50,18 +39,16 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import { ChevronDown } from "lucide-react";
+import EmployeeLeave from "./EmployeeLeave";
 
 const formatTime = (totalSeconds) => {
   const hours = Math.floor(totalSeconds / 3600);
   const minutes = Math.floor((totalSeconds % 3600) / 60);
   const seconds = totalSeconds % 60;
-
   const parts = [];
   if (hours > 0) parts.push(`${hours} hr${hours !== 1 ? "s" : ""}`);
   if (minutes > 0) parts.push(`${minutes} min${minutes !== 1 ? "s" : ""}`);
   if (seconds > 0) parts.push(`${seconds} sec${seconds !== 1 ? "s" : ""}`);
-
   return parts.length > 0 ? parts.join(" ") : "0 sec";
 };
 
@@ -69,37 +56,37 @@ export default function EmployeeDashboard() {
   const [currentWeekStart, setCurrentWeekStart] = useState(
     startOfWeek(new Date(), { weekStartsOn: 1 })
   );
-  const [leaveWeekStart, setLeaveWeekStart] = useState(
-    startOfWeek(new Date(), { weekStartsOn: 1 })
-  );
-  const [leaveDialogOpen, setLeaveDialogOpen] = useState(false);
-  const [editDialogOpen, setEditDialogOpen] = useState(false);
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [leaveType, setLeaveType] = useState("");
-  const [fromDate, setFromDate] = useState();
-  const [toDate, setToDate] = useState();
-  const [reason, setReason] = useState("");
-  const [attachment, setAttachment] = useState();
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isLoadingLeaves, setIsLoadingLeaves] = useState(false);
   const [isLoadingTimeEntries, setIsLoadingTimeEntries] = useState(false);
   const [currentEmployee, setCurrentEmployee] = useState(null);
-  const [leaveRequests, setLeaveRequests] = useState([]);
-  const [selectedLeave, setSelectedLeave] = useState(null);
-  const [statusFilter, setStatusFilter] = useState("All");
+  const [allProjects, setAllProjects] = useState([]);
+  const [approvedLeaves, setApprovedLeaves] = useState([]);
   const [timeEntries, setTimeEntries] = useState([]);
   const [isTimesheetOpen, setIsTimesheetOpen] = useState(false);
-  const [searchTerm, setSearchTerm] = useState("");
+  const [manualEntry, setManualEntry] = useState({
+    project: "",
+    task: "",
+    description: "",
+    hours: "",
+    date: format(new Date(), "yyyy-MM-dd"),
+  });
+  const [manualEntryDialogOpen, setManualEntryDialogOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [projectTypeFilter, setProjectTypeFilter] = useState("all");
   const dispatch = useDispatch();
+
+  const weekDates = useMemo(
+    () => Array.from({ length: 7 }, (_, i) => addDays(currentWeekStart, i)),
+    [currentWeekStart]
+  );
 
   useEffect(() => {
     let isMounted = true;
-
     const fetchCurrentEmployee = async () => {
       try {
-        const response = await axiosInstance.get("/api/v1/employee");
+        const response = await axiosInstance.get("/api/v1/employee/me");
         if (isMounted) {
-          const employee = response.data.employees[0];
+          const employee = response.data.employee;
+          console.log("Current employee", employee);
           setCurrentEmployee(employee);
         }
       } catch (error) {
@@ -109,9 +96,7 @@ export default function EmployeeDashboard() {
         }
       }
     };
-
     fetchCurrentEmployee();
-
     return () => {
       isMounted = false;
     };
@@ -119,43 +104,78 @@ export default function EmployeeDashboard() {
 
   useEffect(() => {
     let isMounted = true;
-
-    const fetchLeaveRequests = async () => {
-      if (!currentEmployee?.user_id) return;
-      setIsLoadingLeaves(true);
+    const fetchProjects = async () => {
       try {
-        const response = await axiosInstance.get("/api/v1/leave", {
-          params: { createdBy: currentEmployee.user_id },
-        });
+        const response = await axiosInstance.get("/api/v1/project");
         if (isMounted) {
-          setLeaveRequests(response.data.leaves || []);
+          setAllProjects(response.data.projects || []);
         }
       } catch (error) {
         if (isMounted) {
-          toast.error("Failed to fetch leave requests. Please try again.");
-          console.error("Error fetching leave requests:", error);
-        }
-      } finally {
-        if (isMounted) {
-          setIsLoadingLeaves(false);
+          toast.error("Failed to fetch projects. Please try again.");
+          console.error("Error fetching projects:", error);
         }
       }
     };
-
-    fetchLeaveRequests();
-    const interval = setInterval(fetchLeaveRequests, 100000);
+    fetchProjects();
     return () => {
-      clearInterval(interval);
       isMounted = false;
     };
+  }, []);
+
+  useEffect(() => {
+    if (currentEmployee) {
+      fetchLeaves();
+    }
   }, [currentEmployee]);
+
+  const fetchLeaves = async () => {
+    if (!currentEmployee) return;
+    let isMounted = true;
+    try {
+      const response = await axiosInstance.get("/api/v1/leave/", {
+        params: {
+          createdBy: currentEmployee.id,
+        },
+      });
+      if (isMounted) {
+        const leaves = response.data.leaves || [];
+        console.log(leaves);
+        const approved = leaves.filter((leave) => leave.status === "Approved");
+        setApprovedLeaves(approved);
+        console.log("Approved leaves", approved);
+      }
+    } catch (error) {
+      if (isMounted) {
+        toast.error("Failed to fetch leaves. Please try again.");
+        console.error("Error fetching leaves:", error);
+      }
+    } finally {
+      if (isMounted) {
+        // No loading state for leaves in dashboard
+      }
+    }
+  };
+
+  const weekApprovedLeaves = useMemo(() => {
+    const weekStartDate = currentWeekStart;
+    const weekEndDate = endOfWeek(currentWeekStart, { weekStartsOn: 1 });
+    return approvedLeaves.filter((leave) => {
+      const leaveStart = parse(leave.fromDate, "yyyy-MM-dd", new Date());
+      const leaveEnd = parse(
+        leave.toDate || leave.fromDate,
+        "yyyy-MM-dd",
+        new Date()
+      );
+      return leaveEnd >= weekStartDate && leaveStart <= weekEndDate;
+    });
+  }, [approvedLeaves, currentWeekStart]);
 
   const fetchTimeEntries = async (weekStart, weekEnd, employeeId) => {
     if (!employeeId) {
       toast.error("Employee ID not available. Please log in again.");
       return;
     }
-
     setIsLoadingTimeEntries(true);
     try {
       const response = await axiosInstance.get("/api/v1/time/timesheets/week", {
@@ -165,19 +185,17 @@ export default function EmployeeDashboard() {
           week_end: weekEnd,
         },
       });
-
       const newEntries = response.data.timeEntries || [];
+      console.log(newEntries);
       if (!Array.isArray(newEntries)) {
         setTimeEntries([]);
         return;
       }
-
       if (newEntries.length === 0) {
         console.log("No time entries found for the given week.");
       } else {
         console.log("Processed time entries:", newEntries);
       }
-
       setTimeEntries(newEntries);
     } catch (error) {
       console.error("Failed to fetch time entries:", error.response || error);
@@ -210,6 +228,57 @@ export default function EmployeeDashboard() {
     }
   }, [currentEmployee, currentWeekStart]);
 
+  const groupedProjects = useMemo(() => {
+    const projectMap = new Map();
+
+    // Initialize with all projects
+    allProjects.forEach((proj) => {
+      if (!proj.id) return;
+      projectMap.set(proj.id, {
+        id: proj.id,
+        name: proj.name || "Unnamed Project",
+        project_type: proj.project_type || "billable",
+        dailyHours: new Array(7).fill(0),
+      });
+    });
+
+    // Add hours from time entries
+    timeEntries.forEach((entry) => {
+      const project = entry.project || entry.task?.project;
+      if (!project || !project.id) return;
+
+      const projectId = project.id;
+      if (!projectMap.has(projectId)) {
+        // Fallback if project not in allProjects
+        projectMap.set(projectId, {
+          id: projectId,
+          name: project.name || "Unnamed Project",
+          project_type: project.project_type || "billable",
+          dailyHours: new Array(7).fill(0),
+        });
+      }
+
+      const projData = projectMap.get(projectId);
+      const entryHours = Number(entry.hours);
+      const entryDate = entry.date;
+      const weekDateStrs = weekDates.map((date) => format(date, "yyyy-MM-dd"));
+      const dayIndex = weekDateStrs.indexOf(entryDate);
+
+      if (dayIndex !== -1) {
+        projData.dailyHours[dayIndex] += entryHours;
+      }
+    });
+
+    return Array.from(projectMap.values());
+  }, [timeEntries, weekDates, allProjects]);
+
+  const filteredProjects = useMemo(() => {
+    if (projectTypeFilter === "all") return groupedProjects;
+    return groupedProjects.filter(
+      (proj) => proj.project_type === projectTypeFilter
+    );
+  }, [groupedProjects, projectTypeFilter]);
+
   const handlePreviousWeek = () => {
     setCurrentWeekStart((prev) => addDays(prev, -7));
   };
@@ -224,280 +293,79 @@ export default function EmployeeDashboard() {
     }
   };
 
-  const handleLeavePreviousWeek = () => {
-    setLeaveWeekStart((prev) => addDays(prev, -7));
-  };
-
-  const handleLeaveNextWeek = () => {
-    setLeaveWeekStart((prev) => addDays(prev, 7));
-  };
-
-  const handleLeaveDateSelect = (date) => {
-    if (date) {
-      setLeaveWeekStart(startOfWeek(date, { weekStartsOn: 1 }));
-    }
-  };
-
-  const handleLeaveSubmit = async () => {
-    if (!currentEmployee) {
-      toast.error("Employee details not loaded. Please try again.");
+  const handleManualEntrySubmit = async () => {
+    if (!manualEntry.project || !manualEntry.task || !manualEntry.hours) {
+      toast.error("Please fill all required fields.");
       return;
     }
-    if (!leaveType) {
-      toast.error("Please select a leave type.");
-      return;
-    }
-    if (!fromDate) {
-      toast.error("Please select a start date.");
-      return;
-    }
-    if (!reason.trim()) {
-      toast.error("Please provide a reason for the leave.");
-      return;
-    }
-    if (toDate && new Date(toDate) < new Date(fromDate)) {
-      toast.error("End date cannot be before start date.");
-      return;
-    }
-
     setIsSubmitting(true);
-
     try {
-      const leaveData = {
-        employeeName: currentEmployee.name,
-        employeeEmail: currentEmployee.email,
-        employeeDepartment: currentEmployee.department,
-        leaveType,
-        fromDate,
-        toDate: toDate || fromDate, // Default to fromDate if toDate is not provided
-        reason,
-        attachment: attachment || null,
-        createdBy: parseInt(currentEmployee.user_id, 10),
+      const entryData = {
+        employee_id: currentEmployee.id,
+        project: manualEntry.project,
+        task: manualEntry.task,
+        description: manualEntry.description,
+        hours: parseFloat(manualEntry.hours),
+        date: manualEntry.date,
       };
-
       const response = await axiosInstance.post(
-        "/api/v1/leave/create",
-        leaveData
+        "/api/v1/time/timesheets",
+        entryData
       );
-      setLeaveRequests((prev) => [...prev, response.data.leave]);
-      toast.success("📝 Your request has been sent to manager for approval");
-
-      setLeaveDialogOpen(false);
-      setLeaveType("");
-      setFromDate(undefined);
-      setToDate(undefined);
-      setReason("");
-      setAttachment(undefined);
+      toast.success("Manual entry added successfully");
+      setManualEntryDialogOpen(false);
+      setManualEntry({
+        project: "",
+        task: "",
+        description: "",
+        hours: "",
+        date: format(new Date(), "yyyy-MM-dd"),
+      });
+      refreshTimeEntries();
     } catch (error) {
-      if (error.response?.status === 400 && error.response?.data?.errors) {
-        const errorMessages = error.response.data.errors
-          .map((err) => err.message)
-          .join(", ");
-        toast.error(`Failed to submit leave request: ${errorMessages}`);
-      } else {
-        toast.error("Failed to submit leave request. Please try again.");
-      }
-      console.error("Error submitting leave request:", error);
+      toast.error("Failed to add manual entry. Please try again.");
+      console.error("Error adding manual entry:", error);
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const handleEditLeave = (leave) => {
-    setSelectedLeave(leave);
-    setLeaveType(leave.leaveType);
-    setFromDate(leave.fromDate);
-    setToDate(leave.toDate);
-    setReason(leave.reason);
-    setAttachment(leave.attachment || "");
-    setEditDialogOpen(true);
+  // submit timesheet
+
+  const submitTimesheet = () => {
+    toast.success("Timesheet successfully submit");
   };
 
-  const handleUpdateLeave = async () => {
-    if (!selectedLeave) return;
-    if (!leaveType) {
-      toast.error("Please select a leave type.");
-      return;
-    }
-    if (!fromDate) {
-      toast.error("Please select a start date.");
-      return;
-    }
-    if (!reason.trim()) {
-      toast.error("Please provide a reason for the leave.");
-      return;
-    }
-    if (toDate && new Date(toDate) < new Date(fromDate)) {
-      toast.error("End date cannot be before start date.");
-      return;
-    }
-
-    setIsSubmitting(true);
-
-    try {
-      const leaveData = {
-        employeeName: currentEmployee.name,
-        employeeEmail: currentEmployee.email,
-        employeeDepartment: currentEmployee.department,
-        leaveType,
-        fromDate,
-        toDate: toDate || fromDate, // Default to fromDate if toDate is not provided
-        reason,
-        attachment: attachment || null,
-        createdBy: parseInt(currentEmployee.user_id, 10),
-      };
-
-      const response = await axiosInstance.patch(
-        `/api/v1/leave/${selectedLeave.id}`,
-        leaveData
-      );
-      setLeaveRequests((prev) =>
-        prev.map((leave) =>
-          leave.id === selectedLeave.id ? response.data.leave : leave
-        )
-      );
-      toast.success("📝 Leave request updated successfully");
-
-      setEditDialogOpen(false);
-      setSelectedLeave(null);
-      setLeaveType("");
-      setFromDate(undefined);
-      setToDate(undefined);
-      setReason("");
-      setAttachment(undefined);
-    } catch (error) {
-      if (error.response?.status === 400 && error.response?.data?.errors) {
-        const errorMessages = error.response.data.errors
-          .map((err) => err.message)
-          .join(", ");
-        toast.error(`Failed to update leave request: ${errorMessages}`);
-      } else {
-        toast.error("Failed to update leave request. Please try again.");
-      }
-      console.error("Error updating leave request:", error);
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const handleDeleteLeave = async () => {
-    if (!selectedLeave) return;
-
-    setIsSubmitting(true);
-
-    try {
-      await axiosInstance.delete(`/api/v1/leave/${selectedLeave.id}`);
-      setLeaveRequests((prev) =>
-        prev.filter((leave) => leave.id !== selectedLeave.id)
-      );
-      toast.success("🗑️ Leave request deleted successfully");
-
-      setDeleteDialogOpen(false);
-      setSelectedLeave(null);
-    } catch (error) {
-      toast.error("Failed to delete leave request. Please try again.");
-      console.error("Error deleting leave request:", error);
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const handleLogout = () => {
-    dispatch(logout());
-    toast.success("Logout successful.");
-  };
-
-  const weekDates = Array.from({ length: 7 }, (_, i) =>
-    addDays(currentWeekStart, i)
-  );
-  const leaveWeekDates = Array.from({ length: 7 }, (_, i) =>
-    addDays(leaveWeekStart, i)
-  );
-
-  const filteredLeaves = leaveRequests.filter((leave) => {
-    const leaveStart = new Date(leave.fromDate);
-    const leaveEnd = new Date(leave.toDate || leave.fromDate); // Use fromDate if toDate is null
-    const weekStart = startOfWeek(leaveWeekStart, { weekStartsOn: 1 });
-    const weekEnd = endOfWeek(leaveWeekStart, { weekStartsOn: 1 });
-    const isInWeek = leaveStart <= weekEnd && leaveEnd >= weekStart;
-    const matchesStatus =
-      statusFilter === "All" || leave.status === statusFilter;
-    return isInWeek && matchesStatus;
-  });
-
-  const calculateDailyTotals = () => {
-    if (!Array.isArray(timeEntries)) {
-      console.error("timeEntries is not an array:", timeEntries);
-      return {
-        dailyTotals: new Array(7).fill({ hours: 0, minutes: 0, seconds: 0 }),
-        dailyEntries: Array.from({ length: 7 }, () => []),
-      };
-    }
-
-    const dailyTotals = new Array(7).fill().map(() => ({
-      hours: 0,
-      minutes: 0,
-      seconds: 0,
-    }));
-    const dailyEntries = Array.from({ length: 7 }, () => []);
-
-    // Debug: Log local week date strings
-    const weekDateStrs = weekDates.map((date) => format(date, "yyyy-MM-dd"));
-
-    timeEntries.forEach((entry) => {
-      if (!entry?.date || !entry?.hours) {
-        console.warn("Invalid time entry:", entry);
-        return;
-      }
-
-      // Convert entry.hours (assumed to be in decimal hours) to seconds
-      const totalSeconds = Math.round(Number(entry.hours) * 3600);
-      const hours = Math.floor(totalSeconds / 3600);
-      const minutes = Math.floor((totalSeconds % 3600) / 60);
-      const seconds = totalSeconds % 60;
-
-      // Use entry.date directly (local string) and compare to local formatted week dates
-      const entryDate = entry.date; // e.g., "2025-09-08"
-      const dayIndex = weekDateStrs.indexOf(entryDate);
-
-      if (dayIndex !== -1) {
-        dailyTotals[dayIndex].hours += hours;
-        dailyTotals[dayIndex].minutes += minutes;
-        dailyTotals[dayIndex].seconds += seconds;
-
-        // Handle overflow in seconds and minutes
-        if (dailyTotals[dayIndex].seconds >= 60) {
-          dailyTotals[dayIndex].minutes += Math.floor(
-            dailyTotals[dayIndex].seconds / 60
-          );
-          dailyTotals[dayIndex].seconds = dailyTotals[dayIndex].seconds % 60;
-        }
-        if (dailyTotals[dayIndex].minutes >= 60) {
-          dailyTotals[dayIndex].hours += Math.floor(
-            dailyTotals[dayIndex].minutes / 60
-          );
-          dailyTotals[dayIndex].minutes = dailyTotals[dayIndex].minutes % 60;
-        }
-
-        dailyEntries[dayIndex].push({
-          ...entry,
-          totalSeconds, // Store total seconds for rendering individual entries
-        });
-      } else {
-        console.warn(
-          `Entry date ${entryDate} does not match any week date:`,
-          weekDateStrs
-        );
-      }
+  const calculateTotalDailyHours = useMemo(() => {
+    const totals = new Array(7).fill(0);
+    filteredProjects.forEach((proj) => {
+      proj.dailyHours.forEach((hours, i) => {
+        totals[i] += hours;
+      });
     });
+    return totals;
+  }, [filteredProjects]);
 
-    return {
-      dailyTotals,
-      dailyEntries,
-    };
+  const getLeaveForDate = (date) => {
+    return weekApprovedLeaves.find((leave) => {
+      const leaveStart = parse(leave.fromDate, "yyyy-MM-dd", new Date());
+      const leaveEnd = parse(
+        leave.toDate || leave.fromDate,
+        "yyyy-MM-dd",
+        new Date()
+      );
+      return date >= leaveStart && date <= leaveEnd;
+    });
   };
 
-  const { dailyTotals, dailyEntries } = calculateDailyTotals();
+  const getLeaveInitial = (leaveType) => {
+    if (!leaveType) return "L";
+    const words = leaveType.split(" ");
+    return words
+      .map((word) => word.charAt(0))
+      .join("")
+      .toUpperCase();
+  };
 
   if (!currentEmployee) {
     return (
@@ -511,519 +379,168 @@ export default function EmployeeDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-gray-100 p-6 space-y-4">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center">
-        <div className="flex items-center gap-2 mb-4 sm:mb-0">
-          <Link to="/freelancer/dashboard">
-            <Button variant="outline">
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Dashboard
-            </Button>
-          </Link>
-        </div>
-        <div className="flex items-center space-x-2">
-          <EmployeeNotification />
-          <Dialog open={leaveDialogOpen} onOpenChange={setLeaveDialogOpen}>
-            <DialogTrigger asChild>
-              <Button variant="outline">
-                <CalendarIcon className="mr-2 h-4 w-4" />
-                Apply Leave
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-100 px-4">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center"></div>
+      <div className="">
+        <div></div>
+
+        <div>
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex space-x-2">
+              <Button variant="ghost" size="sm" onClick={handlePreviousWeek}>
+                <ChevronLeft className="h-4 w-4 mr-2" />
+                Previous Week
               </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-md">
-              <DialogHeader>
-                <DialogTitle>Submit Leave Request</DialogTitle>
-                <DialogDescription>
-                  Fill in the details for your leave request. For a single-day
-                  leave, you can leave the "To Date" field empty.
-                </DialogDescription>
-              </DialogHeader>
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium mb-1">
-                    Leave Type *
-                  </label>
-                  <Select value={leaveType} onValueChange={setLeaveType}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select leave type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Casual Leave">Casual Leave</SelectItem>
-                      <SelectItem value="Sick Leave">Sick Leave</SelectItem>
-                      <SelectItem value="Earned Leave">Earned Leave</SelectItem>
-                      <SelectItem value="Maternity Leave">
-                        Maternity Leave
-                      </SelectItem>
-                      <SelectItem value="Paternity Leave">
-                        Paternity Leave
-                      </SelectItem>
-                      <SelectItem value="Other">Other</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="flex gap-2">
-                  <div className="w-full">
-                    <label className="block text-sm font-medium mb-1">
-                      From Date *
-                    </label>
-                    <Input
-                      type="date"
-                      value={fromDate || ""}
-                      onChange={(e) => setFromDate(e.target.value)}
-                    />
-                  </div>
-                  <div className="w-full">
-                    <label className="block text-sm font-medium mb-1">
-                      To Date (Optional)
-                    </label>
-                    <Input
-                      type="date"
-                      value={toDate || ""}
-                      onChange={(e) => setToDate(e.target.value)}
-                    />
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">
-                    Reason *
-                  </label>
-                  <Textarea
-                    placeholder="Please provide reason for leave..."
-                    value={reason}
-                    onChange={(e) => setReason(e.target.value)}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">
-                    Photo (Optional)
-                  </label>
-                  <Input
-                    type="url"
-                    value={attachment || ""}
-                    onChange={(e) => setAttachment(e.target.value)}
-                  />
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Upload medical certificate or supporting documents
-                  </p>
-                </div>
-              </div>
-              <DialogFooter className="mt-4">
-                <Button
-                  variant="outline"
-                  onClick={() => setLeaveDialogOpen(false)}
-                >
-                  Cancel
-                </Button>
-                <Button onClick={handleLeaveSubmit} disabled={isSubmitting}>
-                  {isSubmitting ? (
-                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                  ) : null}
-                  {isSubmitting ? "Submitting..." : "Submit Request"}
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-          <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
-            <DialogContent className="sm:max-w-md">
-              <DialogHeader>
-                <DialogTitle>Edit Leave Request</DialogTitle>
-                <DialogDescription>
-                  Update the details for your leave request. For a single-day
-                  leave, you can leave the "To Date" field empty.
-                </DialogDescription>
-              </DialogHeader>
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium mb-1">
-                    Leave Type *
-                  </label>
-                  <Select value={leaveType} onValueChange={setLeaveType}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select leave type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Casual Leave">Casual Leave</SelectItem>
-                      <SelectItem value="Sick Leave">Sick Leave</SelectItem>
-                      <SelectItem value="Earned Leave">Earned Leave</SelectItem>
-                      <SelectItem value="Maternity Leave">
-                        Maternity Leave
-                      </SelectItem>
-                      <SelectItem value="Paternity Leave">
-                        Paternity Leave
-                      </SelectItem>
-                      <SelectItem value="Other">Other</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="flex gap-2">
-                  <div className="w-full">
-                    <label className="block text-sm font-medium mb-1">
-                      From Date *
-                    </label>
-                    <Input
-                      type="date"
-                      value={fromDate || ""}
-                      onChange={(e) => setFromDate(e.target.value)}
-                    />
-                  </div>
-                  <div className="w-full">
-                    <label className="block text-sm font-medium mb-1">
-                      To Date (Optional)
-                    </label>
-                    <Input
-                      type="date"
-                      value={toDate || ""}
-                      onChange={(e) => setToDate(e.target.value)}
-                    />
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">
-                    Reason *
-                  </label>
-                  <Textarea
-                    placeholder="Please provide reason for leave..."
-                    value={reason}
-                    onChange={(e) => setReason(e.target.value)}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">
-                    Photo (Optional)
-                  </label>
-                  <Input
-                    type="url"
-                    value={attachment || ""}
-                    onChange={(e) => setAttachment(e.target.value)}
-                  />
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Upload medical certificate or supporting documents
-                  </p>
-                </div>
-              </div>
-              <DialogFooter className="mt-4">
-                <Button
-                  variant="outline"
-                  onClick={() => setEditDialogOpen(false)}
-                >
-                  Cancel
-                </Button>
-                <Button onClick={handleUpdateLeave} disabled={isSubmitting}>
-                  {isSubmitting ? (
-                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                  ) : null}
-                  {isSubmitting ? "Updating..." : "Update Request"}
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-          <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-            <DialogContent className="sm:max-w-md">
-              <DialogHeader>
-                <DialogTitle>Delete Leave Request</DialogTitle>
-                <DialogDescription>
-                  Are you sure you want to delete this leave request? This
-                  action cannot be undone.
-                </DialogDescription>
-              </DialogHeader>
-              <DialogFooter className="mt-4">
-                <Button
-                  variant="outline"
-                  onClick={() => setDeleteDialogOpen(false)}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  variant="destructive"
-                  onClick={handleDeleteLeave}
-                  disabled={isSubmitting}
-                >
-                  {isSubmitting ? (
-                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                  ) : null}
-                  {isSubmitting ? "Deleting..." : "Delete"}
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-        </div>
-      </div>
-
-      <div>
-        <TimeTracker
-          timeEntries={timeEntries}
-          setTimeEntries={setTimeEntries}
-          refreshTimeEntries={refreshTimeEntries}
-          currentEmployee={currentEmployee}
-        />
-      </div>
-
-      <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold text-gray-800">Leave Requests</h3>
-      </div>
-
-      <div className="flex items-center mb-4">
-        <Button variant="ghost" size="sm" onClick={handleLeavePreviousWeek}>
-          <ChevronLeft className="h-4 w-4 mr-2" />
-          Previous Week
-        </Button>
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button variant="outline" className="w-64 justify-start text-left">
-              <CalendarIcon className="mr-2 h-4 w-4" />
-              {format(leaveWeekDates[0], "MMM dd")} -{" "}
-              {format(leaveWeekDates[6], "MMM dd, yyyy")}
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-auto p-0">
-            <Calendar
-              mode="single"
-              selected={leaveWeekStart}
-              onSelect={handleLeaveDateSelect}
-              initialFocus
-            />
-          </PopoverContent>
-        </Popover>
-        <Button variant="ghost" size="sm" onClick={handleLeaveNextWeek}>
-          Next Week
-          <ChevronRight className="h-4 w-4 ml-2" />
-        </Button>
-      </div>
-
-      <Card className="p-6 shadow-lg rounded-lg">
-        {isLoadingLeaves ? (
-          <div className="flex justify-center items-center py-4">
-            <Loader2 className="h-6 w-6 animate-spin text-primary" />
-          </div>
-        ) : filteredLeaves.length > 0 ? (
-          <div className="space-y-4">
-            {filteredLeaves.map((leave) => (
-              <div
-                key={leave.id}
-                className="border border-gray-200 rounded-lg p-4 bg-white shadow-sm hover:shadow-md transition-shadow duration-200"
-              >
-                <div className="flex justify-between items-center">
-                  <div className="flex items-center space-x-3">
-                    <CalendarIcon className="h-5 w-5 text-primary" />
-                    <div>
-                      <div className="font-medium text-base">
-                        {leave.leaveType}
-                      </div>
-                      <div className="text-sm text-muted-foreground">
-                        {format(new Date(leave.fromDate), "MMM dd, yyyy")}
-                        {leave.toDate && leave.toDate !== leave.fromDate ? (
-                          <>
-                            {" "}
-                            - {format(new Date(leave.toDate), "MMM dd, yyyy")}
-                          </>
-                        ) : (
-                          ""
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <span
-                      className={`px-2 py-1 rounded-full text-xs font-semibold ${
-                        leave.status === "Approved"
-                          ? "bg-green-100 text-green-800"
-                          : leave.status === "Pending"
-                          ? "bg-yellow-100 text-yellow-800"
-                          : "bg-red-100 text-red-800"
-                      }`}
-                    >
-                      {leave.status}
-                    </span>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleEditLeave(leave)}
-                      disabled={leave.status === "Approved"}
-                      className="text-blue-600 hover:text-blue-800"
-                    >
-                      <Edit className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => {
-                        setSelectedLeave(leave);
-                        setDeleteDialogOpen(true);
-                      }}
-                      disabled={leave.status === "Approved"}
-                      className="text-red-600 hover:text-red-800"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-                <div className="mt-2 text-sm text-muted-foreground">
-                  <span className="font-medium">Reason:</span> {leave.reason}
-                </div>
-                {leave.attachment && (
-                  <div className="mt-2">
-                    <a
-                      href={leave.attachment}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-blue-600 hover:underline text-sm"
-                    >
-                      View Attachment
-                    </a>
-                  </div>
-                )}
-                {leave.status === "Rejected" && leave.remarks && (
-                  <div className="mt-2 text-sm text-muted-foreground">
-                    <span className="font-medium">Remarks:</span>{" "}
-                    {leave.remarks}
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="text-muted-foreground text-center py-4">
-            No leave requests for this week.
-          </div>
-        )}
-      </Card>
-
-      <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold text-gray-800">Time Entries</h3>
-      </div>
-
-      <div className="flex items-center mb-4">
-        <Button variant="ghost" size="sm" onClick={handlePreviousWeek}>
-          <ChevronLeft className="h-4 w-4 mr-2" />
-          Previous Week
-        </Button>
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button variant="outline" className="w-64 justify-start text-left">
-              <CalendarIcon className="mr-2 h-4 w-4" />
-              {format(weekDates[0], "MMM dd")} -{" "}
-              {format(weekDates[6], "MMM dd, yyyy")}
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-auto p-0">
-            <Calendar
-              mode="single"
-              selected={currentWeekStart}
-              onSelect={handleDateSelect}
-              initialFocus
-            />
-          </PopoverContent>
-        </Popover>
-        <Button variant="ghost" size="sm" onClick={handleNextWeek}>
-          Next Week
-          <ChevronRight className="h-4 w-4 ml-2" />
-        </Button>
-      </div>
-
-      <Card className="p-6 shadow-lg rounded-lg">
-        {isLoadingTimeEntries ? (
-          <div className="flex justify-center items-center py-4">
-            <Loader2 className="h-6 w-6 animate-spin text-primary" />
-          </div>
-        ) : (
-          <Collapsible open={isTimesheetOpen} onOpenChange={setIsTimesheetOpen}>
-            <CollapsibleTrigger asChild>
-              <div className="flex items-center justify-between mb-4 cursor-pointer">
-                <h3 className="text-lg font-semibold text-gray-800">
-                  Weekly Timesheet
-                </h3>
-                <ChevronDown
-                  className={`h-5 w-5 text-gray-600 transition-transform duration-200 ${
-                    isTimesheetOpen ? "rotate-180" : "rotate-0"
-                  }`}
-                />
-              </div>
-            </CollapsibleTrigger>
-            <CollapsibleContent>
-              <div className="space-y-6">
-                {weekDates.map((date, index) => (
-                  <div
-                    key={date.toISOString()}
-                    className="border-b pb-4 last:border-b-0"
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="w-64 justify-start text-left"
                   >
-                    <div className="flex justify-between items-center mb-3">
-                      <h3 className="text-lg font-semibold text-gray-800">
-                        {format(date, "EEE")}
-                      </h3>
-                      <div className="text-sm font-medium text-blue-800 bg-gradient-to-r from-blue-100 to-blue-200 px-3 py-1 rounded-full shadow-sm">
-                        Total:{" "}
-                        {formatTime(
-                          dailyTotals[index].hours * 3600 +
-                            dailyTotals[index].minutes * 60 +
-                            dailyTotals[index].seconds
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {format(weekDates[0], "MMM dd")} -{" "}
+                    {format(weekDates[6], "dd, yyyy")}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0">
+                  <Calendar
+                    mode="single"
+                    selected={currentWeekStart}
+                    onSelect={handleDateSelect}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
+              <Button variant="ghost" size="sm" onClick={handleNextWeek}>
+                Next Week
+                <ChevronRight className="h-4 w-4 ml-2" />
+              </Button>
+            </div>
+            <Select
+              value={projectTypeFilter}
+              onValueChange={setProjectTypeFilter}
+            >
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Filter by Type" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Projects</SelectItem>
+                <SelectItem value="billable">Billable</SelectItem>
+                <SelectItem value="non-billable">Non-Billable</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <Card className="p-6 shadow-lg rounded-lg">
+            {isLoadingTimeEntries ? (
+              <div className="flex justify-center items-center py-4">
+                <Loader2 className="h-6 w-6 animate-spin text-primary" />
+              </div>
+            ) : (
+              <>
+                {/* Day Headers */}
+                <div className="grid grid-cols-8 gap-0 bg-blue-50 p-2 rounded-t-md mb-0">
+                  <div className="col-span-1"></div>
+                  {weekDates.map((date, i) => (
+                    <div
+                      key={date.toISOString()}
+                      className="text-center text-sm font-medium text-gray-700"
+                    >
+                      {format(date, "EEE dd")}
+                    </div>
+                  ))}
+                </div>
+
+                {/* Absence Section */}
+                <div className="grid grid-cols-8 gap-0 border-b border-gray-200">
+                  <div className="col-span-1 p-3 pl-4 font-medium text-gray-800">
+                    <span className="flex items-center gap-2">
+                      <ChevronDown /> Absence
+                    </span>
+                  </div>
+                  {weekDates.map((date) => {
+                    const coveringLeave = getLeaveForDate(date);
+                    return (
+                      <div
+                        key={date.toISOString()}
+                        className="p-2 border-l border-gray-200 text-center text-sm text-muted-foreground min-h-[80px] flex items-center justify-center"
+                      >
+                        {coveringLeave ? (
+                          <span
+                            className="px-2 py-1 bg-yellow-100 text-yellow-800 rounded text-xs font-medium"
+                            title={coveringLeave.leaveType || "Leave"}
+                          >
+                            {getLeaveInitial(coveringLeave.leaveType)}
+                          </span>
+                        ) : (
+                          "-"
                         )}
                       </div>
+                    );
+                  })}
+                </div>
+                <div className="bg-gray-50 p-4 border-b border-gray-200 mb-4">
+                  {weekApprovedLeaves.length === 0 && (
+                    <div className="text-center text-sm text-muted-foreground">
+                      No approved leave for this week.
                     </div>
-                    {dailyEntries[index].length > 0 ? (
-                      <div className="grid gap-3">
-                        {dailyEntries[index]
-                          .filter((entry) =>
-                            entry.description
-                              ?.toLowerCase()
-                              .includes(searchTerm.toLowerCase())
-                          )
-                          .map((entry) => (
-                            <div
-                              key={entry.id}
-                              className="flex items-center justify-between p-3 bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow duration-200 border border-gray-200"
-                            >
-                              <div className="flex items-center space-x-3">
-                                <Clock className="h-5 w-5 text-blue-600" />
-                                <div>
-                                  <div className="font-medium text-sm">
-                                    {entry.description || "No description"}
-                                  </div>
-                                  <div className="text-xs text-muted-foreground">
-                                    Project:{" "}
-                                    {entry.task?.project?.name ||
-                                      entry.project?.name ||
-                                      entry.project_id ||
-                                      "No Project"}{" "}
-                                    | Task:{" "}
-                                    {entry.task?.name ||
-                                      entry.task_id ||
-                                      "No Task"}
-                                  </div>
-                                </div>
-                              </div>
-                              <div className="text-sm font-medium text-gray-800 bg-gradient-to-r from-gray-100 to-gray-200 px-2 py-1 rounded-md shadow-sm">
-                                {formatTime(entry.totalSeconds)}
-                              </div>
-                            </div>
-                          ))}
+                  )}
+                </div>
+
+                {/* Projects Sections (Job Group) */}
+                <div className="border-[1px] rounded-lg">
+                  <h3 className="p-5 text-lg font-semibold border-b">
+                    <span className="flex items-center gap-2">
+                      <ChevronDown /> Job Group : Billable
+                    </span>
+                  </h3>
+                  {filteredProjects.map((project) => (
+                    <div key={project.id} className="border-b border-gray-200">
+                      <div className="grid grid-cols-8 gap-0">
+                        <div className="col-span-8 p-3 pl-4 font-medium text-gray-800 bg-gray-50">
+                          {project.name} ({project.project_type})
+                        </div>
                       </div>
-                    ) : (
-                      <div className="text-muted-foreground text-sm text-center py-2">
-                        No time entries for this day
-                      </div>
-                    )}
+                    </div>
+                  ))}
+                </div>
+                {filteredProjects.length === 0 && (
+                  <div className="bg-gray-50 p-4 border-b border-gray-200">
+                    <div className="text-center text-sm text-muted-foreground">
+                      No projects found for the selected filter.
+                    </div>
                   </div>
-                ))}
-              </div>
-            </CollapsibleContent>
-          </Collapsible>
-        )}
-        <div className="grid grid-cols-8 font-medium border-t pt-2 bg-muted px-4 py-2 rounded-md mt-4">
-          <div className="text-left">Total Time</div>
-          {weekDates.map((_, i) => (
-            <div
-              key={i}
-              className="text-center text-sm font-medium text-blue-800 bg-gradient-to-r from-blue-50 to-blue-100 px-2 py-1 rounded-md shadow-sm"
-            >
-              {formatTime(
-                dailyTotals[i].hours * 3600 +
-                  dailyTotals[i].minutes * 60 +
-                  dailyTotals[i].seconds
-              )}
-            </div>
-          ))}
+                )}
+
+                {/* Total Hours */}
+                <div className="grid grid-cols-8 gap-0 bg-gray-100 p-3 rounded-b-md">
+                  <div className="col-span-1 font-medium text-gray-800 pl-4">
+                    Total Hours
+                  </div>
+                  {weekDates.map((_, i) => (
+                    <div
+                      key={i}
+                      className="text-center text-sm font-medium text-gray-700"
+                    >
+                      {calculateTotalDailyHours[i] > 0
+                        ? calculateTotalDailyHours[i].toFixed(1)
+                        : "0"}
+                    </div>
+                  ))}
+                </div>
+
+                <div className="flex justify-end mt-4">
+                  <Button
+                    onClick={submitTimesheet}
+                    className="bg-purple-500 hover:bg-purple-600 text-white"
+                  >
+                    Submit Timesheet
+                  </Button>
+                </div>
+              </>
+            )}
+          </Card>
         </div>
-      </Card>
+      </div>
     </div>
   );
 }

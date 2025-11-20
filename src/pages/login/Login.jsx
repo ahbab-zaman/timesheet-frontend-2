@@ -9,12 +9,9 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Clock, Users, CheckCircle } from "lucide-react";
-import {
-  useLoginMutation,
-  useRegisterMutation,
-} from "@/redux/features/auth/authApi";
+import { Clock, Users, CheckCircle, Eye, EyeOff, Mail } from "lucide-react";
+import { useLoginMutation } from "@/redux/features/auth/authApi";
+import { useForgetPasswordMutation } from "@/redux/features/auth/authApi"; // Assume this RTK Query hook is added similarly to useLoginMutation
 import { useDispatch } from "react-redux";
 import { setUser } from "@/redux/features/auth/authSlice";
 import { verifyToken } from "@/utils/verifyToken";
@@ -24,93 +21,125 @@ import { toast } from "sonner";
 const Login = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [fullName, setFullName] = useState("");
-  const [employeeId, setEmployeeId] = useState("");
-  const [department, setDepartment] = useState("");
-  const [position, setPosition] = useState("");
-  const [hourlyRate, setHourlyRate] = useState("");
-  const [contactNumber, setContactNumber] = useState(""); // Added contact number state
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [isForgetPassword, setIsForgetPassword] = useState(false);
+  const [forgetEmail, setForgetEmail] = useState("");
+  const [forgetLoading, setForgetLoading] = useState(false);
 
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const [login] = useLoginMutation();
-  const [register] = useRegisterMutation();
+  const [forgetPassword] = useForgetPasswordMutation(); // Assume this mutation is defined in authApi
+
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+  const validateEmail = (email) => {
+    return emailRegex.test(email);
+  };
+
+  const validatePassword = (password) => {
+    return password.length >= 6;
+  };
 
   const handleUserLogin = async (e) => {
     e.preventDefault();
     setLoading(true);
+
+    // Client-side validation
+    if (!email.trim()) {
+      toast.error("Email is required.");
+      setLoading(false);
+      return;
+    }
+    if (!validateEmail(email)) {
+      toast.error("Please enter the correct email ID");
+      setLoading(false);
+      return;
+    }
+    if (!password.trim()) {
+      toast.error("Password is required.");
+      setLoading(false);
+      return;
+    }
+    if (!validatePassword(password)) {
+      toast.error("Please enter the correct password");
+      setLoading(false);
+      return;
+    }
 
     try {
       const credentials = { email, password };
       const response = await login(credentials).unwrap();
 
       if (response.error) {
-        toast.error("Invalid email or password.");
+        if (response.error === "invalid_email") {
+          toast.error("Please enter the correct email ID");
+        } else if (response.error === "invalid_password") {
+          toast.error("Please enter the correct password");
+        } else if (response.error === "user_not_found") {
+          toast.error(
+            "Please connect to Admin or Manager for more information"
+          );
+        } else {
+          toast.error("Invalid email or password.");
+        }
         setLoading(false);
         return;
       }
 
       toast.success("Login successful ✅");
 
-      // Save token
+      // Save token & update Redux (unchanged)
       localStorage.setItem("authToken", response.token);
-
-      // Decode token & update Redux
       const user = verifyToken(response.token);
       dispatch(setUser({ user, token: response.token }));
 
       // Redirect based on role
       navigate(`/${user.role.toLowerCase()}/dashboard`);
     } catch (error) {
-      toast.error("Something went wrong!");
+      if (error?.data?.error === "invalid_email") {
+        toast.error("Please enter the correct email ID");
+      } else if (error?.data?.error === "invalid_password") {
+        toast.error("Please enter the correct password");
+      } else if (error?.data?.error === "user_not_found") {
+        toast.error("Please connect to Admin or Manager for more information");
+      } else {
+        toast.error("Something went wrong!");
+      }
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSignUp = async (e) => {
+  const handleForgetPassword = async (e) => {
     e.preventDefault();
-    setLoading(true);
+    setForgetLoading(true);
+
+    if (!forgetEmail.trim()) {
+      toast.error("Email is required.");
+      setForgetLoading(false);
+      return;
+    }
+    if (!validateEmail(forgetEmail)) {
+      toast.error("Please enter a valid email.");
+      setForgetLoading(false);
+      return;
+    }
 
     try {
-      const userData = {
-        fullName,
-        email,
-        password,
-        employeeId: employeeId || null,
-        department: department || null,
-        position: position || null,
-        hourlyRate: hourlyRate ? parseFloat(hourlyRate) : null,
-        contactNumber: contactNumber || null, // Added contact number to userData
-      };
-      const response = await register(userData).unwrap();
-
-      if (response.error) {
-        toast.error(response.error || "Registration failed.");
-        setLoading(false);
-        return;
-      }
-
-      toast.success(
-        "Registration successful! You have been registered as an Employee. You can now log in."
-      );
-
-      // Clear form
-      setFullName("");
-      setEmail("");
-      setPassword("");
-      setEmployeeId("");
-      setDepartment("");
-      setPosition("");
-      setHourlyRate("");
-      setContactNumber(""); // Clear contact number
+      await forgetPassword({ email: forgetEmail }).unwrap();
+      toast.success("Password reset email sent! Check your inbox.");
+      setIsForgetPassword(false);
+      setForgetEmail("");
     } catch (error) {
-      toast.error(
-        error?.data?.error || "Something went wrong during registration!"
-      );
+      if (error?.data?.error === "user_not_found") {
+        toast.error("No user found with this email.");
+      } else {
+        toast.error("Something went wrong! Please try again.");
+      }
     } finally {
-      setLoading(false);
+      setForgetLoading(false);
     }
   };
 
@@ -135,40 +164,60 @@ const Login = () => {
             </div>
           </div>
           <h1 className="text-2xl font-bold text-foreground">
-            AIREPRO TIMESHEET
+            AIREPRO EMPLOYEE MANAGEMENT SERVICE
           </h1>
-          <p className="text-muted-foreground mt-2">
-            Fill your timesheet to make every hour count ✨
-          </p>
         </div>
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-center">Welcome</CardTitle>
+            <CardTitle className="text-center">
+              {isForgetPassword
+                ? "Forgot Password?"
+                : "Welcome To Airepro Pvt Ltd"}
+            </CardTitle>
             <CardDescription className="text-center">
-              Sign in to access your timesheet dashboard
-              <br />
-              {/* ✅ Sample credentials for testing */}
-              <div className="text-xs text-muted-foreground mt-3 space-y-1">
-                <div>
-                  <strong>Client:</strong> client@test.com / client123
-                </div>
-                <div>
-                  <strong>Freelancer:</strong> freelancer@test.com /
-                  freelancer123
-                </div>
-              </div>
+              {isForgetPassword
+                ? "Enter your email to receive a password reset link."
+                : ""}
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <Tabs defaultValue="signin" className="w-full">
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="signin">Sign In</TabsTrigger>
-                <TabsTrigger value="signup">Sign Up</TabsTrigger>
-              </TabsList>
-
-              {/* Sign In */}
-              <TabsContent value="signin">
+            {isForgetPassword ? (
+              /* Forgot Password Form */
+              <form onSubmit={handleForgetPassword} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="forgetEmail">Email</Label>
+                  <div className="relative">
+                    <Input
+                      id="forgetEmail"
+                      type="email"
+                      placeholder="Enter your email"
+                      value={forgetEmail}
+                      onChange={(e) => setForgetEmail(e.target.value)}
+                      required
+                    />
+                    <Mail className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  </div>
+                </div>
+                <Button
+                  type="submit"
+                  className="w-full"
+                  disabled={forgetLoading}
+                >
+                  {forgetLoading ? "Sending..." : "Send Reset Link"}
+                </Button>
+                <Button
+                  type="button"
+                  variant="link"
+                  className="w-full text-center"
+                  onClick={() => setIsForgetPassword(false)}
+                >
+                  Back to Login
+                </Button>
+              </form>
+            ) : (
+              /* Only Login Form - No Tabs */
+              <>
                 <form onSubmit={handleUserLogin} className="space-y-4">
                   <div className="space-y-2">
                     <Label htmlFor="email">Email</Label>
@@ -183,137 +232,49 @@ const Login = () => {
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="password">Password</Label>
-                    <Input
-                      id="password"
-                      type="password"
-                      placeholder="Enter your password"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      required
-                    />
+                    <div className="relative">
+                      <Input
+                        id="password"
+                        type={showPassword ? "text" : "password"}
+                        placeholder="Enter your password"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        required
+                        className="pr-10"
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="absolute right-2 top-1/2 transform -translate-y-1/2 h-4 w-4 p-0"
+                        onClick={() => setShowPassword(!showPassword)}
+                      >
+                        {showPassword ? (
+                          <EyeOff className="h-4 w-4" />
+                        ) : (
+                          <Eye className="h-4 w-4" />
+                        )}
+                      </Button>
+                    </div>
                   </div>
                   <Button type="submit" className="w-full" disabled={loading}>
                     {loading ? "Signing in..." : "Sign In"}
                   </Button>
                 </form>
-              </TabsContent>
-
-              {/* Sign Up */}
-              <TabsContent value="signup">
-                <form onSubmit={handleSignUp} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="fullName">Full Name</Label>
-                    <Input
-                      id="fullName"
-                      type="text"
-                      placeholder="Enter your full name"
-                      value={fullName}
-                      onChange={(e) => setFullName(e.target.value)}
-                      required
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="email">Email</Label>
-                    <Input
-                      id="email"
-                      type="email"
-                      placeholder="Enter your email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      required
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="password">Password</Label>
-                    <Input
-                      id="password"
-                      type="password"
-                      placeholder="Create a password"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      required
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="contactNumber">
-                      Contact Number (optional)
-                    </Label>
-                    <Input
-                      id="contactNumber"
-                      type="tel"
-                      placeholder="Enter your contact number"
-                      value={contactNumber}
-                      onChange={(e) => setContactNumber(e.target.value)}
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="employeeId">Freelancer ID (optional)</Label>
-                    <Input
-                      id="employeeId"
-                      type="text"
-                      placeholder="Enter your freelancer ID"
-                      value={employeeId}
-                      onChange={(e) => setEmployeeId(e.target.value)}
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="department">Department (optional)</Label>
-                    <Input
-                      id="department"
-                      type="text"
-                      placeholder="Enter your department"
-                      value={department}
-                      onChange={(e) => setDepartment(e.target.value)}
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="position">Position (optional)</Label>
-                    <Input
-                      id="position"
-                      type="text"
-                      placeholder="Enter your position"
-                      value={position}
-                      onChange={(e) => setPosition(e.target.value)}
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="hourlyRate">Hourly Rate (optional)</Label>
-                    <Input
-                      id="hourlyRate"
-                      type="number"
-                      step="0.01"
-                      placeholder="Enter your hourly rate"
-                      value={hourlyRate}
-                      onChange={(e) => setHourlyRate(e.target.value)}
-                    />
-                  </div>
-
-                  <Button type="submit" className="w-full" disabled={loading}>
-                    {loading ? "Creating account..." : "Sign Up"}
+                <div className="pt-4">
+                  <Button
+                    type="button"
+                    variant="link"
+                    className="w-full text-center text-sm"
+                    onClick={() => setIsForgetPassword(true)}
+                  >
+                    Forgot Password?
                   </Button>
-                </form>
-              </TabsContent>
-            </Tabs>
+                </div>
+              </>
+            )}
           </CardContent>
         </Card>
-
-        <div className="mt-8 grid grid-cols-1 gap-4 text-center text-sm text-muted-foreground">
-          <div className="flex items-center justify-center gap-2">
-            <Users className="h-4 w-4" />
-            <span>Team collaboration made easy</span>
-          </div>
-          <div className="flex items-center justify-center gap-2">
-            <CheckCircle className="h-4 w-4" />
-            <span>Manager review keeps project hours aligned ✅</span>
-          </div>
-        </div>
       </div>
     </div>
   );
