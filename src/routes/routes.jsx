@@ -11,6 +11,15 @@ import EmployeeNav from "@/pages/employee/EmployeeNav";
 import EmployeeTask from "@/components/EmployeeTask";
 import EmployeeSettings from "@/pages/employee/EmployeeSetting";
 import EmployeeLeave from "@/pages/employee/EmployeeLeave";
+import ManagerNav from "@/pages/manager/ManagerNav";
+import ManagerTimesheets from "@/pages/manager/ManagerTimesheets";
+import TimesheetsView from "@/pages/manager/TimesheetView";
+import ManagerTask from "@/pages/manager/ManagerTaskManagement";
+import ManagerLeave from "@/pages/manager/ManagerLeave";
+import TimesheetsTab from "@/pages/manager/TimesheetsTab";
+import ProductivityTab from "@/pages/manager/ProductivityTab";
+import ManagerProjectsTab from "@/pages/manager/ManagerProjectsTab";
+import PersonalizationTab from "@/pages/manager/PersonalizationTab";
 
 const router = createBrowserRouter([
   // Root → redirect based on role if logged in
@@ -22,15 +31,25 @@ const router = createBrowserRouter([
       </ProtectedRoute>
     ),
   },
-  // Manager Routes
+  // Client Routes
   {
     path: "/client",
     element: (
       <ProtectedRoute>
-        <App />
+        <ManagerNav />
       </ProtectedRoute>
     ),
-    children: [{ path: "dashboard", element: <ManagerDashboard /> }],
+    children: [
+      { path: "dashboard", element: <ManagerDashboard /> },
+      { path: "timesheets", element: <ManagerTimesheets /> },
+      { path: "timesheets-view", element: <TimesheetsView /> },
+      { path: "tasks", element: <ManagerTask /> },
+      { path: "leave-holidays", element: <ManagerLeave /> },
+      { path: "timesheets-projects", element: <TimesheetsTab /> },
+      { path: "productivity", element: <ProductivityTab /> },
+      { path: "project-overview", element: <ManagerProjectsTab /> },
+      { path: "personalization", element: <PersonalizationTab /> },
+    ],
   },
   // Employee Routes
   {
