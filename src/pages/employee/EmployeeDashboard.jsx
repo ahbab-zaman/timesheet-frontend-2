@@ -1,16 +1,18 @@
 import { useState, useEffect, useMemo } from "react";
-import { format, addDays, startOfWeek, endOfWeek, parse } from "date-fns";
 import {
-  CalendarIcon,
-  ChevronLeft,
-  ChevronRight,
-  Filter,
-  Search,
-  Loader2,
-  ArrowLeft,
-  Clock,
-  ChevronDown,
-} from "lucide-react";
+  format,
+  addDays,
+  startOfWeek,
+  endOfWeek,
+  parse,
+  startOfMonth,
+  endOfMonth,
+  startOfYear,
+  endOfYear,
+  addMonths,
+  addWeeks,
+} from "date-fns";
+import { CalendarIcon, Loader2, ChevronDown } from "lucide-react";
 import {
   Popover,
   PopoverContent,
@@ -18,529 +20,477 @@ import {
 } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { toast } from "sonner";
-import TimeTracker from "./TimeTracker";
-import EmployeeNotification from "./EmployeeNotification";
-import { useDispatch } from "react-redux";
-import { logout } from "@/redux/features/auth/authSlice";
 import axiosInstance from "../../services/axiosInstance";
-import { Link } from "react-router-dom";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
-import EmployeeLeave from "./EmployeeLeave";
-
-const formatTime = (totalSeconds) => {
-  const hours = Math.floor(totalSeconds / 3600);
-  const minutes = Math.floor((totalSeconds % 3600) / 60);
-  const seconds = totalSeconds % 60;
-  const parts = [];
-  if (hours > 0) parts.push(`${hours} hr${hours !== 1 ? "s" : ""}`);
-  if (minutes > 0) parts.push(`${minutes} min${minutes !== 1 ? "s" : ""}`);
-  if (seconds > 0) parts.push(`${seconds} sec${seconds !== 1 ? "s" : ""}`);
-  return parts.length > 0 ? parts.join(" ") : "0 sec";
-};
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export default function EmployeeDashboard() {
-  const [currentWeekStart, setCurrentWeekStart] = useState(
+  const [viewMode, setViewMode] = useState("week");
+  const [currentPeriodStart, setCurrentPeriodStart] = useState(
     startOfWeek(new Date(), { weekStartsOn: 1 })
   );
   const [isLoadingTimeEntries, setIsLoadingTimeEntries] = useState(false);
   const [currentEmployee, setCurrentEmployee] = useState(null);
-  const [allProjects, setAllProjects] = useState([]);
   const [approvedLeaves, setApprovedLeaves] = useState([]);
   const [timeEntries, setTimeEntries] = useState([]);
-  const [isTimesheetOpen, setIsTimesheetOpen] = useState(false);
-  const [manualEntry, setManualEntry] = useState({
-    project: "",
-    task: "",
-    description: "",
-    hours: "",
-    date: format(new Date(), "yyyy-MM-dd"),
-  });
-  const [manualEntryDialogOpen, setManualEntryDialogOpen] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [projectTypeFilter, setProjectTypeFilter] = useState("all");
-  const dispatch = useDispatch();
-
-  const weekDates = useMemo(
-    () => Array.from({ length: 7 }, (_, i) => addDays(currentWeekStart, i)),
-    [currentWeekStart]
-  );
 
   useEffect(() => {
-    let isMounted = true;
-    const fetchCurrentEmployee = async () => {
-      try {
-        const response = await axiosInstance.get("/api/v1/employee/me");
-        if (isMounted) {
-          const employee = response.data.employee;
-          console.log("Current employee", employee);
-          setCurrentEmployee(employee);
-        }
-      } catch (error) {
-        if (isMounted) {
-          toast.error("Failed to fetch employee details. Please try again.");
-          console.error("Error fetching current employee:", error);
-        }
+    const now = new Date();
+    let initial;
+    if (viewMode === "week") initial = startOfWeek(now, { weekStartsOn: 1 });
+    else if (viewMode === "month") initial = startOfMonth(now);
+    else initial = startOfYear(now);
+    setCurrentPeriodStart(initial);
+  }, [viewMode]);
+
+  const periodDates = useMemo(() => {
+    if (viewMode === "week") {
+      return Array.from({ length: 7 }, (_, i) =>
+        addDays(currentPeriodStart, i)
+      );
+    } else if (viewMode === "month") {
+      const endDate = endOfMonth(currentPeriodStart);
+      const numDays = endDate.getDate();
+      return Array.from({ length: numDays }, (_, i) =>
+        addDays(currentPeriodStart, i)
+      );
+    } else {
+      const months = [];
+      let current = currentPeriodStart;
+      for (let i = 0; i < 12; i++) {
+        months.push(current);
+        current = addMonths(current, 1);
       }
-    };
-    fetchCurrentEmployee();
-    return () => {
-      isMounted = false;
-    };
-  }, []);
-
-  useEffect(() => {
-    let isMounted = true;
-    const fetchProjects = async () => {
-      try {
-        const response = await axiosInstance.get("/api/v1/project");
-        if (isMounted) {
-          setAllProjects(response.data.projects || []);
-        }
-      } catch (error) {
-        if (isMounted) {
-          toast.error("Failed to fetch projects. Please try again.");
-          console.error("Error fetching projects:", error);
-        }
-      }
-    };
-    fetchProjects();
-    return () => {
-      isMounted = false;
-    };
-  }, []);
-
-  useEffect(() => {
-    if (currentEmployee) {
-      fetchLeaves();
+      return months;
     }
+  }, [viewMode, currentPeriodStart]);
+
+  const periodLabel = useMemo(() => {
+    if (viewMode === "week")
+      return `${format(periodDates[0], "MMM dd")} - ${format(
+        periodDates[periodDates.length - 1],
+        "dd, yyyy"
+      )}`;
+    else if (viewMode === "month")
+      return format(currentPeriodStart, "MMMM yyyy");
+    else return format(currentPeriodStart, "yyyy");
+  }, [viewMode, periodDates, currentPeriodStart]);
+
+  useEffect(() => {
+    let mounted = true;
+    const fetchEmployee = async () => {
+      try {
+        const res = await axiosInstance.get("/api/v1/employee/me");
+        if (mounted) setCurrentEmployee(res.data.employee);
+      } catch {
+        toast.error("Failed to fetch employee details.");
+      }
+    };
+    fetchEmployee();
+    return () => (mounted = false);
+  }, []);
+
+  useEffect(() => {
+    if (!currentEmployee) return;
+    let mounted = true;
+    const fetchLeaves = async () => {
+      try {
+        const res = await axiosInstance.get("/api/v1/leave/", {
+          params: { createdBy: currentEmployee.id },
+        });
+        if (mounted) {
+          const approved = (res.data.leaves || []).filter(
+            (l) => l.status === "Approved"
+          );
+          setApprovedLeaves(approved);
+        }
+      } catch {
+        toast.error("Failed to fetch leaves.");
+      }
+    };
+    fetchLeaves();
+    return () => (mounted = false);
   }, [currentEmployee]);
 
-  const fetchLeaves = async () => {
-    if (!currentEmployee) return;
-    let isMounted = true;
-    try {
-      const response = await axiosInstance.get("/api/v1/leave/", {
-        params: {
-          createdBy: currentEmployee.id,
-        },
-      });
-      if (isMounted) {
-        const leaves = response.data.leaves || [];
-        console.log(leaves);
-        const approved = leaves.filter((leave) => leave.status === "Approved");
-        setApprovedLeaves(approved);
-        console.log("Approved leaves", approved);
-      }
-    } catch (error) {
-      if (isMounted) {
-        toast.error("Failed to fetch leaves. Please try again.");
-        console.error("Error fetching leaves:", error);
-      }
-    } finally {
-      if (isMounted) {
-        // No loading state for leaves in dashboard
-      }
-    }
-  };
-
-  const weekApprovedLeaves = useMemo(() => {
-    const weekStartDate = currentWeekStart;
-    const weekEndDate = endOfWeek(currentWeekStart, { weekStartsOn: 1 });
-    return approvedLeaves.filter((leave) => {
-      const leaveStart = parse(leave.fromDate, "yyyy-MM-dd", new Date());
-      const leaveEnd = parse(
+  const getLeaveForDate = (date) => {
+    return approvedLeaves.find((leave) => {
+      const start = parse(leave.fromDate, "yyyy-MM-dd", new Date());
+      const end = parse(
         leave.toDate || leave.fromDate,
         "yyyy-MM-dd",
         new Date()
       );
-      return leaveEnd >= weekStartDate && leaveStart <= weekEndDate;
+      return start <= date && end >= date;
     });
-  }, [approvedLeaves, currentWeekStart]);
+  };
 
-  const fetchTimeEntries = async (weekStart, weekEnd, employeeId) => {
-    if (!employeeId) {
-      toast.error("Employee ID not available. Please log in again.");
-      return;
-    }
+  const fetchTimeEntries = async (periodStart, periodEnd, employeeId) => {
+    if (!employeeId) return;
     setIsLoadingTimeEntries(true);
     try {
-      const response = await axiosInstance.get("/api/v1/time/timesheets/week", {
+      const res = await axiosInstance.get("/api/v1/time/timesheets/week", {
         params: {
           employee_id: employeeId,
-          week_start: weekStart,
-          week_end: weekEnd,
+          week_start: periodStart,
+          week_end: periodEnd,
         },
       });
-      const newEntries = response.data.timeEntries || [];
-      console.log(newEntries);
-      if (!Array.isArray(newEntries)) {
-        setTimeEntries([]);
-        return;
-      }
-      if (newEntries.length === 0) {
-        console.log("No time entries found for the given week.");
-      } else {
-        console.log("Processed time entries:", newEntries);
-      }
-      setTimeEntries(newEntries);
-    } catch (error) {
-      console.error("Failed to fetch time entries:", error.response || error);
-      toast.error(`Failed to load time entries: ${error.message}`);
-      setTimeEntries([]);
+      // Map backend response to frontend expected fields
+      const mappedEntries = (res.data.timeEntries || []).map((entry) => ({
+        ...entry,
+        date: entry.date, // assuming date is in yyyy-MM-dd
+        hoursWorked: parseFloat(entry.hours) || 0,
+        workLog: entry.workLog || "great", // assume or default
+        status: res.data.status || "approved", // from timesheet
+        checkIn: entry.checkIn || "-", // assume fields exist or default
+        checkOut: entry.checkOut || "-",
+        breakHours: entry.breakHours || 0,
+      }));
+      setTimeEntries(mappedEntries);
+    } catch {
+      toast.error("Failed to load time entries");
     } finally {
       setIsLoadingTimeEntries(false);
     }
   };
 
   const refreshTimeEntries = () => {
-    if (currentEmployee?.id) {
-      const weekStart = format(currentWeekStart, "yyyy-MM-dd");
-      const weekEnd = format(
-        endOfWeek(currentWeekStart, { weekStartsOn: 1 }),
+    if (!currentEmployee?.id) return;
+    let ps, pe;
+    if (viewMode === "week") {
+      ps = format(currentPeriodStart, "yyyy-MM-dd");
+      pe = format(
+        endOfWeek(currentPeriodStart, { weekStartsOn: 1 }),
         "yyyy-MM-dd"
       );
-      fetchTimeEntries(weekStart, weekEnd, currentEmployee.id);
+    } else if (viewMode === "month") {
+      const monthStart = startOfMonth(currentPeriodStart);
+      const fetchStart = startOfWeek(monthStart, { weekStartsOn: 1 });
+      const monthEnd = endOfMonth(currentPeriodStart);
+      const fetchEnd = endOfWeek(monthEnd, { weekStartsOn: 1 });
+      ps = format(fetchStart, "yyyy-MM-dd");
+      pe = format(fetchEnd, "yyyy-MM-dd");
+    } else {
+      ps = format(currentPeriodStart, "yyyy-MM-dd");
+      pe = format(endOfYear(currentPeriodStart), "yyyy-MM-dd");
     }
+    fetchTimeEntries(ps, pe, currentEmployee.id);
   };
 
   useEffect(() => {
-    if (currentEmployee?.id) {
-      const weekStart = format(currentWeekStart, "yyyy-MM-dd");
-      const weekEnd = format(
-        endOfWeek(currentWeekStart, { weekStartsOn: 1 }),
-        "yyyy-MM-dd"
-      );
-      fetchTimeEntries(weekStart, weekEnd, currentEmployee.id);
-    }
-  }, [currentEmployee, currentWeekStart]);
+    if (!currentEmployee?.id) return;
+    refreshTimeEntries();
+  }, [currentEmployee, currentPeriodStart, viewMode]);
 
-  const groupedProjects = useMemo(() => {
-    const projectMap = new Map();
-
-    // Initialize with all projects
-    allProjects.forEach((proj) => {
-      if (!proj.id) return;
-      projectMap.set(proj.id, {
-        id: proj.id,
-        name: proj.name || "Unnamed Project",
-        project_type: proj.project_type || "billable",
-        dailyHours: new Array(7).fill(0),
-      });
+  const weeklyData = useMemo(() => {
+    const data = [];
+    const datesWithEntriesOrLeave = periodDates.filter((date) => {
+      const leave = getLeaveForDate(date);
+      if (leave) return true;
+      const entryDateStr = format(date, "yyyy-MM-dd");
+      return timeEntries.some((e) => e.date === entryDateStr);
     });
-
-    // Add hours from time entries
-    timeEntries.forEach((entry) => {
-      const project = entry.project || entry.task?.project;
-      if (!project || !project.id) return;
-
-      const projectId = project.id;
-      if (!projectMap.has(projectId)) {
-        // Fallback if project not in allProjects
-        projectMap.set(projectId, {
-          id: projectId,
-          name: project.name || "Unnamed Project",
-          project_type: project.project_type || "billable",
-          dailyHours: new Array(7).fill(0),
+    datesWithEntriesOrLeave.forEach((date) => {
+      const leave = getLeaveForDate(date);
+      if (leave) {
+        data.push({
+          date,
+          day: format(date, "EEEE"),
+          checkIn: "-",
+          checkOut: "-",
+          breakHours: 0,
+          hoursWorked: "Leave",
+          workLog: "-",
+          status: "approved",
+        });
+      } else {
+        const entryDateStr = format(date, "yyyy-MM-dd");
+        const entry = timeEntries.find((e) => e.date === entryDateStr);
+        data.push({
+          date,
+          day: format(date, "EEEE"),
+          checkIn: entry?.checkIn || "-",
+          checkOut: entry?.checkOut || "-",
+          breakHours: entry?.breakHours || 0,
+          hoursWorked: entry?.hoursWorked || 0,
+          workLog: entry?.workLog || "-",
+          status: "approved",
         });
       }
+    });
+    return data;
+  }, [periodDates, timeEntries, approvedLeaves]);
 
-      const projData = projectMap.get(projectId);
-      const entryHours = Number(entry.hours);
-      const entryDate = entry.date;
-      const weekDateStrs = weekDates.map((date) => format(date, "yyyy-MM-dd"));
-      const dayIndex = weekDateStrs.indexOf(entryDate);
-
-      if (dayIndex !== -1) {
-        projData.dailyHours[dayIndex] += entryHours;
+  const monthlyWeeks = useMemo(() => {
+    const weeks = [];
+    let weekStart = startOfWeek(startOfMonth(currentPeriodStart), {
+      weekStartsOn: 1,
+    });
+    const monthEndPlus = addMonths(endOfMonth(currentPeriodStart), 1);
+    while (weekStart < monthEndPlus) {
+      const weekEnd = endOfWeek(weekStart, { weekStartsOn: 1 });
+      if (
+        weekEnd >= startOfMonth(currentPeriodStart) &&
+        weekStart <= endOfMonth(currentPeriodStart)
+      ) {
+        weeks.push({
+          start: weekStart,
+          end: weekEnd,
+          label: `${format(weekStart, "MMM d")} - ${format(weekEnd, "MMM d")}`,
+        });
       }
-    });
-
-    return Array.from(projectMap.values());
-  }, [timeEntries, weekDates, allProjects]);
-
-  const filteredProjects = useMemo(() => {
-    if (projectTypeFilter === "all") return groupedProjects;
-    return groupedProjects.filter(
-      (proj) => proj.project_type === projectTypeFilter
-    );
-  }, [groupedProjects, projectTypeFilter]);
-
-  const handlePreviousWeek = () => {
-    setCurrentWeekStart((prev) => addDays(prev, -7));
-  };
-
-  const handleNextWeek = () => {
-    setCurrentWeekStart((prev) => addDays(prev, 7));
-  };
-
-  const handleDateSelect = (date) => {
-    if (date) {
-      setCurrentWeekStart(startOfWeek(date, { weekStartsOn: 1 }));
+      weekStart = addWeeks(weekStart, 1);
     }
-  };
+    return weeks;
+  }, [currentPeriodStart]);
 
-  const handleManualEntrySubmit = async () => {
-    if (!manualEntry.project || !manualEntry.task || !manualEntry.hours) {
-      toast.error("Please fill all required fields.");
-      return;
-    }
-    setIsSubmitting(true);
-    try {
-      const entryData = {
-        employee_id: currentEmployee.id,
-        project: manualEntry.project,
-        task: manualEntry.task,
-        description: manualEntry.description,
-        hours: parseFloat(manualEntry.hours),
-        date: manualEntry.date,
-      };
-      const response = await axiosInstance.post(
-        "/api/v1/time/timesheets",
-        entryData
-      );
-      toast.success("Manual entry added successfully");
-      setManualEntryDialogOpen(false);
-      setManualEntry({
-        project: "",
-        task: "",
-        description: "",
-        hours: "",
-        date: format(new Date(), "yyyy-MM-dd"),
-      });
-      refreshTimeEntries();
-    } catch (error) {
-      toast.error("Failed to add manual entry. Please try again.");
-      console.error("Error adding manual entry:", error);
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
+  const monthlyData = useMemo(() => {
+    return monthlyWeeks
+      .map((week) => {
+        const weekEntries = timeEntries.filter((e) => {
+          const ed = new Date(e.date);
+          return ed >= week.start && ed <= week.end;
+        });
+        const totalHours = weekEntries.reduce(
+          (sum, e) => sum + (e.hoursWorked || 0),
+          0
+        );
+        const workingDays = new Set(
+          weekEntries.map((e) => format(new Date(e.date), "yyyy-MM-dd"))
+        ).size;
+        const avg =
+          workingDays > 0 ? (totalHours / workingDays).toFixed(1) : "0.0";
+        return {
+          week: week.label,
+          totalHours: totalHours.toFixed(1),
+          workingDays,
+          avgHours: avg,
+          status: "approved",
+        };
+      })
+      .filter((d) => parseFloat(d.totalHours) > 0); // filter empty weeks
+  }, [monthlyWeeks, timeEntries]);
 
-  // submit timesheet
+  const yearlyData = useMemo(() => {
+    return periodDates
+      .map((monthStart) => {
+        const monthEnd = endOfMonth(monthStart);
+        const monthEntries = timeEntries.filter((e) => {
+          const ed = new Date(e.date);
+          return ed >= monthStart && ed <= monthEnd;
+        });
+        const totalHours = monthEntries.reduce(
+          (sum, e) => sum + (e.hoursWorked || 0),
+          0
+        );
+        const workingDays = new Set(
+          monthEntries.map((e) => format(new Date(e.date), "yyyy-MM-dd"))
+        ).size;
+        const avg =
+          workingDays > 0 ? (totalHours / workingDays).toFixed(1) : "0.0";
+        return {
+          month: format(monthStart, "MMM"),
+          totalHours: totalHours.toFixed(1),
+          workingDays,
+          avgHours: avg,
+          status: "approved",
+        };
+      })
+      .filter((d) => parseFloat(d.totalHours) > 0);
+  }, [periodDates, timeEntries]);
 
-  const submitTimesheet = () => {
-    toast.success("Timesheet successfully submit");
-  };
-
-  const calculateTotalDailyHours = useMemo(() => {
-    const totals = new Array(7).fill(0);
-    filteredProjects.forEach((proj) => {
-      proj.dailyHours.forEach((hours, i) => {
-        totals[i] += hours;
-      });
-    });
-    return totals;
-  }, [filteredProjects]);
-
-  const getLeaveForDate = (date) => {
-    return weekApprovedLeaves.find((leave) => {
-      const leaveStart = parse(leave.fromDate, "yyyy-MM-dd", new Date());
-      const leaveEnd = parse(
-        leave.toDate || leave.fromDate,
-        "yyyy-MM-dd",
-        new Date()
-      );
-      return date >= leaveStart && date <= leaveEnd;
-    });
-  };
-
-  const getLeaveInitial = (leaveType) => {
-    if (!leaveType) return "L";
-    const words = leaveType.split(" ");
-    return words
-      .map((word) => word.charAt(0))
-      .join("")
-      .toUpperCase();
-  };
-
-  if (!currentEmployee) {
+  if (!currentEmployee)
     return (
       <div className="min-h-screen flex justify-center items-center">
-        <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto" />
-          <p className="text-muted-foreground mt-2">Loading employee data...</p>
-        </div>
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
-  }
+
+  const renderWeekly = () => (
+    <div className="overflow-x-auto">
+      <table className="min-w-full divide-y divide-gray-200">
+        <thead className="bg-gray-50">
+          <tr>
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[150px]">
+              Employee
+            </th>
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              Date
+            </th>
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              Day
+            </th>
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              Check-in
+            </th>
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              Check-out
+            </th>
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              Break (hrs)
+            </th>
+            <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+              Status
+            </th>
+          </tr>
+        </thead>
+        <tbody className="bg-white divide-y divide-gray-200">
+          {weeklyData.map((row, i) => (
+            <tr key={i}>
+              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 w-[150px]">
+                {currentEmployee.name || "Abhuzzaman"}
+              </td>
+              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                {format(row.date, "MMM dd, yyyy")}
+              </td>
+              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                {row.day}
+              </td>
+              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                {row.checkIn}
+              </td>
+              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                {row.checkOut}
+              </td>
+              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                {typeof row.breakHours === "number"
+                  ? row.breakHours.toFixed(2)
+                  : row.breakHours}
+              </td>
+              <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                <span
+                  className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                    row.status === "approved"
+                      ? "bg-green-100 text-green-800"
+                      : "bg-yellow-100 text-yellow-800"
+                  }`}
+                >
+                  {row.status}
+                </span>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+
+  const renderSummary = (data, periodLabel) => {
+    const periodKey = viewMode === "month" ? "week" : "month";
+    return (
+      <div className="overflow-x-auto">
+        <table className="min-w-full divide-y divide-gray-200">
+          <thead className="bg-gray-50">
+            <tr>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[150px]">
+                Employee
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                {periodLabel}
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Total Hours
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Working days
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Avg Hours/Day
+              </th>
+              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Status
+              </th>
+            </tr>
+          </thead>
+          <tbody className="bg-white divide-y divide-gray-200">
+            {data.map((row, i) => (
+              <tr key={i}>
+                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 w-[150px]">
+                  {currentEmployee.name || "Abhuzzaman"}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  {row[periodKey]}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  {row.totalHours}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  {row.workingDays}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  {row.avgHours}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                  <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
+                    {row.status}
+                  </span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    );
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-100 px-4">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center"></div>
-      <div className="">
-        <div></div>
+      <Tabs
+        value={viewMode}
+        onValueChange={setViewMode}
+        className="w-full mb-4"
+      >
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="week">Weekly</TabsTrigger>
+          <TabsTrigger value="month">Monthly</TabsTrigger>
+          <TabsTrigger value="year">Yearly</TabsTrigger>
+        </TabsList>
+      </Tabs>
 
-        <div>
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex space-x-2">
-              <Button variant="ghost" size="sm" onClick={handlePreviousWeek}>
-                <ChevronLeft className="h-4 w-4 mr-2" />
-                Previous Week
-              </Button>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className="w-64 justify-start text-left"
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {format(weekDates[0], "MMM dd")} -{" "}
-                    {format(weekDates[6], "dd, yyyy")}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0">
-                  <Calendar
-                    mode="single"
-                    selected={currentWeekStart}
-                    onSelect={handleDateSelect}
-                    initialFocus
-                  />
-                </PopoverContent>
-              </Popover>
-              <Button variant="ghost" size="sm" onClick={handleNextWeek}>
-                Next Week
-                <ChevronRight className="h-4 w-4 ml-2" />
-              </Button>
-            </div>
-            <Select
-              value={projectTypeFilter}
-              onValueChange={setProjectTypeFilter}
+      <div className="flex justify-between items-center mb-4">
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button
+              variant="outline"
+              className="w-auto justify-start text-left font-medium"
             >
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Filter by Type" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Projects</SelectItem>
-                <SelectItem value="billable">Billable</SelectItem>
-                <SelectItem value="non-billable">Non-Billable</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <Card className="p-6 shadow-lg rounded-lg">
-            {isLoadingTimeEntries ? (
-              <div className="flex justify-center items-center py-4">
-                <Loader2 className="h-6 w-6 animate-spin text-primary" />
-              </div>
-            ) : (
-              <>
-                {/* Day Headers */}
-                <div className="grid grid-cols-8 gap-0 bg-blue-50 p-2 rounded-t-md mb-0">
-                  <div className="col-span-1"></div>
-                  {weekDates.map((date, i) => (
-                    <div
-                      key={date.toISOString()}
-                      className="text-center text-sm font-medium text-gray-700"
-                    >
-                      {format(date, "EEE dd")}
-                    </div>
-                  ))}
-                </div>
-
-                {/* Absence Section */}
-                <div className="grid grid-cols-8 gap-0 border-b border-gray-200">
-                  <div className="col-span-1 p-3 pl-4 font-medium text-gray-800">
-                    <span className="flex items-center gap-2">
-                      <ChevronDown /> Absence
-                    </span>
-                  </div>
-                  {weekDates.map((date) => {
-                    const coveringLeave = getLeaveForDate(date);
-                    return (
-                      <div
-                        key={date.toISOString()}
-                        className="p-2 border-l border-gray-200 text-center text-sm text-muted-foreground min-h-[80px] flex items-center justify-center"
-                      >
-                        {coveringLeave ? (
-                          <span
-                            className="px-2 py-1 bg-yellow-100 text-yellow-800 rounded text-xs font-medium"
-                            title={coveringLeave.leaveType || "Leave"}
-                          >
-                            {getLeaveInitial(coveringLeave.leaveType)}
-                          </span>
-                        ) : (
-                          "-"
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-                <div className="bg-gray-50 p-4 border-b border-gray-200 mb-4">
-                  {weekApprovedLeaves.length === 0 && (
-                    <div className="text-center text-sm text-muted-foreground">
-                      No approved leave for this week.
-                    </div>
-                  )}
-                </div>
-
-                {/* Projects Sections (Job Group) */}
-                <div className="border-[1px] rounded-lg">
-                  <h3 className="p-5 text-lg font-semibold border-b">
-                    <span className="flex items-center gap-2">
-                      <ChevronDown /> Job Group : Billable
-                    </span>
-                  </h3>
-                  {filteredProjects.map((project) => (
-                    <div key={project.id} className="border-b border-gray-200">
-                      <div className="grid grid-cols-8 gap-0">
-                        <div className="col-span-8 p-3 pl-4 font-medium text-gray-800 bg-gray-50">
-                          {project.name} ({project.project_type})
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                {filteredProjects.length === 0 && (
-                  <div className="bg-gray-50 p-4 border-b border-gray-200">
-                    <div className="text-center text-sm text-muted-foreground">
-                      No projects found for the selected filter.
-                    </div>
-                  </div>
-                )}
-
-                {/* Total Hours */}
-                <div className="grid grid-cols-8 gap-0 bg-gray-100 p-3 rounded-b-md">
-                  <div className="col-span-1 font-medium text-gray-800 pl-4">
-                    Total Hours
-                  </div>
-                  {weekDates.map((_, i) => (
-                    <div
-                      key={i}
-                      className="text-center text-sm font-medium text-gray-700"
-                    >
-                      {calculateTotalDailyHours[i] > 0
-                        ? calculateTotalDailyHours[i].toFixed(1)
-                        : "0"}
-                    </div>
-                  ))}
-                </div>
-
-                <div className="flex justify-end mt-4">
-                  <Button
-                    onClick={submitTimesheet}
-                    className="bg-purple-500 hover:bg-purple-600 text-white"
-                  >
-                    Submit Timesheet
-                  </Button>
-                </div>
-              </>
-            )}
-          </Card>
-        </div>
+              <CalendarIcon className="mr-2 h-4 w-4" />
+              {periodLabel}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-0">
+            <Calendar
+              mode="single"
+              selected={currentPeriodStart}
+              onSelect={(d) => {
+                if (!d) return;
+                setCurrentPeriodStart(
+                  viewMode === "week"
+                    ? startOfWeek(d, { weekStartsOn: 1 })
+                    : viewMode === "month"
+                    ? startOfMonth(d)
+                    : startOfYear(d)
+                );
+              }}
+            />
+          </PopoverContent>
+        </Popover>
       </div>
+
+      <Card className="p-6 shadow-lg rounded-lg">
+        {isLoadingTimeEntries ? (
+          <div className="flex justify-center items-center py-4">
+            <Loader2 className="h-6 w-6 animate-spin text-primary" />
+          </div>
+        ) : (
+          <>
+            {viewMode === "week" && renderWeekly()}
+            {viewMode === "month" && renderSummary(monthlyData, "Week")}
+            {viewMode === "year" && renderSummary(yearlyData, "Month")}
+          </>
+        )}
+      </Card>
     </div>
   );
 }
