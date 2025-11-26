@@ -328,7 +328,7 @@ export default function EmployeeDashboard() {
               Check-out
             </th>
             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-              Break (hrs)
+              Worked (hrs)
             </th>
             <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
               Status
@@ -354,9 +354,9 @@ export default function EmployeeDashboard() {
                 {row.checkOut}
               </td>
               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                {typeof row.breakHours === "number"
-                  ? row.breakHours.toFixed(2)
-                  : row.breakHours}
+                {typeof row.hoursWorked === "number"
+                  ? row.hoursWorked.toFixed(2)
+                  : row.hoursWorked}
               </td>
               <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                 <span

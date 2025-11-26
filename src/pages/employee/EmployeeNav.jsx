@@ -155,7 +155,7 @@ const EmployeeNav = () => {
 
               <DropdownMenuItem asChild>
                 <Link
-                  to="/employee/settings"
+                  to="/freelancer/settings"
                   className="flex items-center gap-2 w-full"
                 >
                   <Settings className="h-4 w-4" />
