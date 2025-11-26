@@ -96,19 +96,7 @@ const TimesheetsView = () => {
   const fetchTimesheets = async () => {
     setIsLoading(true);
     try {
-      let params = {};
-
-      // For weekly view, pass week_start and week_end
-      if (viewType === "weekly") {
-        params = {
-          week_start: currentPeriod.start,
-          week_end: currentPeriod.end,
-        };
-      }
-
-      const response = await axiosInstance.get("/api/v1/time/timesheets/all", {
-        params,
-      });
+      const response = await axiosInstance.get("/api/v1/time/timesheets/all");
 
       let allTimesheets = response.data;
       if (allTimesheets && allTimesheets.timesheets) {
@@ -117,17 +105,14 @@ const TimesheetsView = () => {
         allTimesheets = [];
       }
 
-      // For monthly and yearly views, filter by date range
-      let filteredTimesheets = allTimesheets;
-      if (viewType !== "weekly") {
-        const periodStart = new Date(currentPeriod.start);
-        const periodEnd = new Date(currentPeriod.end);
-        filteredTimesheets = allTimesheets.filter((ts) => {
-          const tsStart = new Date(ts.week_start_date);
-          const tsEnd = new Date(ts.week_end_date);
-          return tsStart <= periodEnd && tsEnd >= periodStart;
-        });
-      }
+      // For all views, filter by date range
+      const periodStart = new Date(currentPeriod.start);
+      const periodEnd = new Date(currentPeriod.end);
+      let filteredTimesheets = allTimesheets.filter((ts) => {
+        const tsStart = new Date(ts.week_start_date);
+        const tsEnd = new Date(ts.week_end_date);
+        return tsStart <= periodEnd && tsEnd >= periodStart;
+      });
 
       // Filter by selected employee if not "all"
       if (selectedEmployee !== "all") {
