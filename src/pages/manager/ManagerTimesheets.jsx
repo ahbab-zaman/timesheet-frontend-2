@@ -69,6 +69,7 @@ const ManagerTimesheets = ({ refreshTimesheetsCallback }) => {
   const [holidays, setHolidays] = useState([]);
   const [allLeaves, setAllLeaves] = useState([]);
 
+  // FIX: Standardized keys to snake_case for consistency with backend
   const [statusCounts, setStatusCounts] = useState({
     waiting_for_approval: 0,
     approved: 0,
@@ -77,6 +78,7 @@ const ManagerTimesheets = ({ refreshTimesheetsCallback }) => {
     all: 0,
   });
 
+  // FIX: Updated values to snake_case to match backend ENUM
   const filterOptions = [
     {
       value: "all",
@@ -85,7 +87,7 @@ const ManagerTimesheets = ({ refreshTimesheetsCallback }) => {
       count: statusCounts.all,
     },
     {
-      value: "waiting for approval",
+      value: "waiting_for_approval",
       label: "Waiting for Approval",
       icon: "⏳",
       count: statusCounts.waiting_for_approval,
@@ -214,10 +216,10 @@ const ManagerTimesheets = ({ refreshTimesheetsCallback }) => {
 
       setAllTimesheetsState(mappedTimesheets);
 
-      // Calculate status counts
+      // FIX: Updated to snake_case for filtering/counts consistency
       const counts = {
         waiting_for_approval: mappedTimesheets.filter(
-          (t) => t.status === "waiting for approval"
+          (t) => t.status === "waiting_for_approval"
         ).length,
         approved: mappedTimesheets.filter((t) => t.status === "approved")
           .length,
@@ -230,7 +232,7 @@ const ManagerTimesheets = ({ refreshTimesheetsCallback }) => {
       };
       setStatusCounts(counts);
 
-      // Apply status filter
+      // Apply status filter (client-side)
       let filtered = mappedTimesheets;
       if (filter !== "all") {
         filtered = mappedTimesheets.filter((t) => t.status === filter);
@@ -373,10 +375,11 @@ const ManagerTimesheets = ({ refreshTimesheetsCallback }) => {
     }
   };
 
+  // FIX: Updated cases to snake_case
   const getHeaderBadge = (status, totalHours) => {
     let label, bgClass, textClass, borderClass;
     switch (status) {
-      case "waiting for approval":
+      case "waiting_for_approval":
         label = "Waiting for Approval";
         bgClass = "bg-yellow-100";
         textClass = "text-yellow-800";
@@ -416,8 +419,11 @@ const ManagerTimesheets = ({ refreshTimesheetsCallback }) => {
     );
   };
 
+  // FIX: Updated cases to snake_case, added explicit waiting case
   const getReviewStatus = (status) => {
     switch (status) {
+      case "waiting_for_approval":
+        return "⏳ Waiting for Approval";
       case "approved":
         return "✓ Approved";
       case "rejected":
@@ -439,6 +445,22 @@ const ManagerTimesheets = ({ refreshTimesheetsCallback }) => {
   const getCurrentFilterLabel = () => {
     const currentFilter = filterOptions.find((opt) => opt.value === filter);
     return currentFilter ? currentFilter.label : "All Timesheets";
+  };
+
+  // FIX: Helper to get count for a filter (dynamic, avoids hardcoding in JSX)
+  const getFilterCount = (filterValue) => {
+    switch (filterValue) {
+      case "waiting_for_approval":
+        return statusCounts.waiting_for_approval;
+      case "approved":
+        return statusCounts.approved;
+      case "rejected":
+        return statusCounts.rejected;
+      case "revision_requested":
+        return statusCounts.revision_requested;
+      default:
+        return statusCounts.all;
+    }
   };
 
   useEffect(() => {
@@ -483,15 +505,8 @@ const ManagerTimesheets = ({ refreshTimesheetsCallback }) => {
                   <Filter className="h-4 w-4" />
                   <span className="font-medium">{getCurrentFilterLabel()}</span>
                   <Badge variant="secondary" className="ml-1">
-                    {filter === "all"
-                      ? statusCounts.all
-                      : filter === "waiting for approval"
-                      ? statusCounts.waiting_for_approval
-                      : filter === "approved"
-                      ? statusCounts.approved
-                      : filter === "rejected"
-                      ? statusCounts.rejected
-                      : statusCounts.revision_requested}
+                    {/* FIX: Use dynamic helper */}
+                    {getFilterCount(filter)}
                   </Badge>
                   <ChevronDown className="h-4 w-4 ml-1" />
                 </Button>
@@ -616,9 +631,10 @@ const ManagerTimesheets = ({ refreshTimesheetsCallback }) => {
                     : filter === "all"
                     ? `No timesheets available for ${periodDisplay}.`
                     : `No ${filter.replace(
-                        "_",
+                        /_/g,
                         " "
-                      )} timesheets found for ${periodDisplay}.`}
+                      )} timesheets found for ${periodDisplay}.`}{" "}
+                  {/* FIX: Global replace for labels */}
                 </p>
                 {employeeSearchTerm && (
                   <Button
